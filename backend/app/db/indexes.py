@@ -21,6 +21,7 @@ from app.models import (
     case,
     consultant_team,
     consultation,
+    daily_briefing,
     investigation,
     contact,
     patient,
@@ -41,6 +42,10 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     patient.COLLECTION: [
         IndexModel([("name", ASCENDING)]),
+    ],
+    daily_briefing.COLLECTION: [
+        # One briefing per team per day; regenerating replaces it.
+        IndexModel([("consultant", ASCENDING), ("date", ASCENDING)], unique=True),
     ],
     patient_questionnaire.COLLECTION: [
         IndexModel([("case", ASCENDING), ("order", ASCENDING)]),

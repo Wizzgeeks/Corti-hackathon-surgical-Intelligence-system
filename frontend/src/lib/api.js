@@ -841,10 +841,15 @@ function reassessInBackground(caseId) {
 
 /** One team's day in counts. `date` is a local YYYY-MM-DD; omitting it lets
  *  the server use its own today. */
-export async function getTodaySummary(consultantTeamId, date) {
+export async function getTodaySummary(consultantTeamId, date, { refresh } = {}) {
   const data = await request(
     'GET',
-    url('/today', { consultant_team_id: consultantTeamId, date }),
+    url('/today', {
+      consultant_team_id: consultantTeamId,
+      date,
+      // Only sent when asked for: the stored briefing is the normal path.
+      refresh: refresh ? 'true' : undefined,
+    }),
     { what: "Loading today's summary" },
   )
   return {
@@ -856,6 +861,7 @@ export async function getTodaySummary(consultantTeamId, date) {
     post_surgery_consultations: data?.post_surgery_consultations ?? 0,
     high_flag_cases: data?.high_flag_cases ?? 0,
     summary_text: toText(data?.summary_text),
+    briefing_by_corti: Boolean(data?.briefing_by_corti),
     appointments: (data?.appointments ?? []).map((item) => ({
       appointment_id: item?.appointment_id ?? '',
       case_id: item?.case_id ?? '',

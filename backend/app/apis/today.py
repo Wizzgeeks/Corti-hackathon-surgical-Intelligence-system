@@ -26,6 +26,8 @@ than being assembled from several calls in the browser.
     400 invalid team id or date
 """
 
+import hashlib
+import json
 import logging
 import re
 from datetime import date as date_type
@@ -37,10 +39,14 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.db.mongodb import get_collection
+from app.models.common import utcnow
+from app.models.daily_briefing import DailyBriefing
+from app.services.corti_textgen import generate_text
 from app.services.elevenlabs import SpeechError, speak
 from app.models import appointment as appointment_model
 from app.models import case as case_model
 from app.models import consultant_team as team_model
+from app.models import daily_briefing as briefing_model
 from app.models import patient as patient_model
 
 logger = logging.getLogger(__name__)
@@ -86,6 +92,8 @@ class TodaySummary(BaseModel):
     appointments: list[TodayAppointment] = Field(default_factory=list)
     # The same day written out as prose, for reading aloud on the way in.
     summary_text: str = ""
+    # False when Corti was unreachable and the plain summary was used.
+    briefing_by_corti: bool = False
 
 
 def day_bounds(day: date_type) -> tuple[datetime, datetime]:
@@ -193,10 +201,166 @@ def build_briefing(
     return " ".join(lines)
 
 
+BRIEFING_NAME = "Daily consultant briefing"
+BRIEFING_HEADING = "Today"
+BRIEFING_PROMPT = (
+    "You are briefing a consultant on their clinic list before they arrive. "
+    "Write it to be listened to, not read: short sentences, no abbreviations, "
+    "no headings, no bullet points, no markdown."
+)
+BRIEFING_CONTENT_PROMPT = (
+    "Open with the date and how many cases, consultations and surgeries there "
+    "are. Then take each appointment in time order and say the time, the "
+    "patient's name, their age and sex, and whether it is a new consultation, "
+    "a follow-up, a post-surgery review or a surgery. Where a case carries "
+    "flags, say what they are and how severe. Mention anything in the case "
+    "summary or recommendation that changes what the consultant should do "
+    "today. Do not invent anything that is not in the material given."
+)
+BRIEFING_STYLE = "Plain spoken English, calm and factual, in the second person."
+
+
+def briefing_context(
+    day: date_type, team_name: str, totals: dict[str, int], items: list[TodayAppointment],
+    case_notes: dict[str, dict[str, Any]],
+) -> str:
+    """The material Corti writes the briefing from.
+
+    Handed over as plain text rather than JSON: the model is being asked to
+    speak it, and the shape of the day reads better than a data structure.
+    """
+    lines = [
+        f"Date: {day.strftime('%A %d %B %Y')}",
+        f"Consultant: {team_name or 'unnamed'}",
+        (
+            f"Totals: {totals['cases']} cases, {totals['consultations']} "
+            f"consultations, {totals['surgeries']} surgeries, "
+            f"{totals['new_consultations']} new, "
+            f"{totals['follow_up_consultations']} follow-up, "
+            f"{totals['post_surgery_consultations']} post-surgery, "
+            f"{totals['high_flag_cases']} with a high flag."
+        ),
+        "",
+        "Appointments:",
+    ]
+    for item in items:
+        kind = CATEGORY_WORDS.get(item.category) or item.appointment_type
+        line = (
+            f"- {item.time} {item.patient_name}"
+            f"{f', {item.patient_age}' if item.patient_age else ''}"
+            f"{f', {item.patient_gender}' if item.patient_gender else ''}. {kind}."
+        )
+        if item.flags:
+            line += " Flags: " + "; ".join(item.flags) + "."
+        notes = case_notes.get(item.case_id) or {}
+        if notes.get("case_summary"):
+            line += f" Case summary: {notes['case_summary']}"
+        if notes.get("recommendation"):
+            line += f" Recommendation: {notes['recommendation']}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def fingerprint(items: list[TodayAppointment], totals: dict[str, int]) -> str:
+    """Identifies the day's list, so a stored briefing can be spotted as stale.
+
+    Covers what a briefing would have to change for: who is booked, when, what
+    kind of appointment, and what is flagged.
+    """
+    material = json.dumps(
+        {
+            "totals": totals,
+            "items": [
+                [i.appointment_id, i.time, i.category, i.patient_name, i.flags]
+                for i in items
+            ],
+        },
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(material.encode()).hexdigest()
+
+
+async def briefing_for_day(
+    team_oid: ObjectId,
+    day: date_type,
+    team_name: str,
+    totals: dict[str, int],
+    items: list[TodayAppointment],
+    case_notes: dict[str, dict[str, Any]],
+    refresh: bool = False,
+) -> tuple[str, bool]:
+    """The stored briefing for this team and day, generating one if needed.
+
+    Returns `(text, from_corti)`. Regenerated when the day's list has changed
+    since it was written, or when `refresh` is asked for — otherwise the
+    stored one is returned untouched, which is the common case: the page is
+    opened repeatedly through a morning that does not change.
+
+    A Corti failure is not fatal. The plainly-assembled summary is stored
+    instead and marked as such, so the page always has something to read and
+    the next request tries Corti again.
+    """
+    briefings = get_collection(briefing_model.COLLECTION)
+    key = {"consultant": team_oid, "date": str(day)}
+    stamp = fingerprint(items, totals)
+
+    stored = await briefings.find_one(key)
+    if (
+        stored
+        and not refresh
+        and stored.get("source_fingerprint") == stamp
+        and stored.get("text")
+        and stored.get("generated_by_corti")
+    ):
+        return stored["text"], True
+
+    fallback = build_briefing(day, team_name, totals, items)
+    text, by_corti = fallback, False
+
+    if items:
+        try:
+            result = await generate_text(
+                name=BRIEFING_NAME,
+                heading=BRIEFING_HEADING,
+                prompt=BRIEFING_PROMPT,
+                content_prompt=BRIEFING_CONTENT_PROMPT,
+                context_text=briefing_context(day, team_name, totals, items, case_notes),
+                access_token=None,
+                writing_style_prompt=BRIEFING_STYLE,
+            )
+        except Exception as exc:  # noqa: BLE001 — the day still needs a briefing
+            logger.warning("Corti could not write the briefing: %s", exc)
+        else:
+            if (result.text or "").strip():
+                text, by_corti = result.text.strip(), True
+
+    record = DailyBriefing(
+        consultant=team_oid,
+        date=str(day),
+        text=text,
+        source_fingerprint=stamp,
+        generated_at=utcnow(),
+        generated_by_corti=by_corti,
+    ).to_mongo()
+    # Replaced rather than appended: one briefing per team per day.
+    await briefings.update_one(key, {"$set": record}, upsert=True)
+    logger.info(
+        "Briefing for %s on %s %s.",
+        team_oid,
+        day,
+        "written by Corti" if by_corti else "assembled locally",
+    )
+    return text, by_corti
+
+
 @router.get("/today", response_model=TodaySummary)
 async def today_summary(
     consultant_team_id: str = Query(..., description="The team whose day this is."),
     day: date_type | None = Query(None, alias="date"),
+    refresh: bool = Query(
+        False, description="Rewrite the briefing even if a current one is stored."
+    ),
 ) -> TodaySummary:
     """Summarise one team's day."""
     if not ObjectId.is_valid(consultant_team_id):
@@ -264,11 +428,19 @@ async def today_summary(
     # Flags are read per case rather than counted, because the briefing names
     # what each one is instead of leaving the listener with a number.
     flags_by_case: dict[Any, list[dict]] = {}
+    case_notes: dict[str, dict[str, Any]] = {}
     if case_ids:
         async for case in get_collection(case_model.COLLECTION).find(
-            {"_id": {"$in": list(case_ids)}}, {"flags": 1}
+            {"_id": {"$in": list(case_ids)}},
+            {"flags": 1, "case_summary": 1, "recommendation": 1},
         ):
             flags_by_case[case["_id"]] = case.get("flags") or []
+            # Carried into the briefing so it can say what today is actually
+            # about, not just who is booked.
+            case_notes[str(case["_id"])] = {
+                "case_summary": (case.get("case_summary") or "").strip(),
+                "recommendation": (case.get("recommendation") or "").strip(),
+            }
 
     high_flag_cases = sum(
         1
@@ -343,14 +515,18 @@ async def today_summary(
         {"_id": team_oid}, {"name": 1}
     )
 
+    team_name = str((team or {}).get("name") or "")
+    summary_text, by_corti = await briefing_for_day(
+        team_oid, day, team_name, totals, items, case_notes, refresh=refresh
+    )
+
     return TodaySummary(
         consultant_team_id=consultant_team_id,
         date=day,
         **totals,
         appointments=items,
-        summary_text=build_briefing(
-            day, str((team or {}).get("name") or ""), totals, items
-        ),
+        summary_text=summary_text,
+        briefing_by_corti=by_corti,
     )
 
 

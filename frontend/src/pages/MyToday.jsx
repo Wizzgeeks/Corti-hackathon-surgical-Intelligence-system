@@ -55,15 +55,31 @@ function MyToday() {
     }
   }, [])
 
-  const load = useCallback(() => {
+  const [rewriting, setRewriting] = useState(false)
+
+  const load = useCallback(
+    (options) => {
     if (!teamId) return undefined
-    return getTodaySummary(teamId, today)
+    return getTodaySummary(teamId, today, options)
       .then((data) => {
         setError('')
         setSummary(data)
       })
       .catch((exc) => setError(exc.message))
-  }, [teamId, today])
+    },
+    [teamId, today],
+  )
+
+  /** Ask Corti to write it again — for when the case notes changed but the
+   *  list of appointments did not, which the stored briefing cannot see. */
+  const rewrite = async () => {
+    setRewriting(true)
+    try {
+      await load({ refresh: true })
+    } finally {
+      setRewriting(false)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -142,7 +158,23 @@ function MyToday() {
               here — the list below repeats it in a form you can click. */}
           <section className="briefing">
             <div className="panel-head">
-              <h3 className="detail-title">Today, out loud</h3>
+              <div>
+                <h3 className="detail-title">Today, out loud</h3>
+                {!summary.briefing_by_corti && summary.cases > 0 && (
+                  <p className="cell-sub">
+                    Written from the booking list — Corti was not reachable
+                    when this was generated.
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={rewriting}
+                onClick={rewrite}
+              >
+                {rewriting ? 'Rewriting…' : 'Rewrite'}
+              </button>
             </div>
             <SpokenBriefing key={summary.summary_text} text={summary.summary_text} />
           </section>
