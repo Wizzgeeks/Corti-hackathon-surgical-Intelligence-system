@@ -60,7 +60,6 @@ PATIENT_FIELDS: tuple[str, ...] = (
     "patient_age",
     "patient_gender",
     "patient_contact",
-    "allergies",
     "referred_to_consultant",
 )
 
@@ -81,7 +80,6 @@ OUTPUT_FIELDS: tuple[str, ...] = (
     "patient_age",
     "patient_gender",
     "patient_contact",
-    "allergies",
     "referred_to_consultant",
     "referred_by",
     "case_summary",
@@ -101,7 +99,6 @@ SAMPLE_OUTPUT: dict[str, Any] = {
         "current_role": "General Practitioner",
         "organization": "Oakfield Surgery",
     },
-    "allergies": "Penicillin",
     "referred_to_consultant": "Mr R Chandru",
     "case_summary": (
         "62-year-old man with six months of progressive right knee pain, worse "

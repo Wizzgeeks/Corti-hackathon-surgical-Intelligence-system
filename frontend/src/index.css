@@ -1804,40 +1804,6 @@ button.block {
   max-width: 260px;
 }
 
-/* --- consultant requests ------------------------------------------------ */
-
-.requests {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-/* The section head sits inside a panel that already has one, so it needs no
-   border of its own. */
-.requests > .panel-head {
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.request-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.request-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-/* Times are recorded by the server and shown as-is. */
-.request-head .cell-sub {
-  white-space: nowrap;
-}
 
 /* --- record consultation ------------------------------------------------ */
 
@@ -1918,4 +1884,301 @@ button.block {
   resize: vertical;
   font-family: inherit;
   line-height: 1.5;
+}
+
+/* --- patient questionnaire (public page) -------------------------------- */
+
+/* Its own full-page surface: this route renders outside the app layout, so
+   it inherits none of the shell's framing. */
+.patient-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px 48px;
+  background: var(--paper-2);
+}
+
+.patient-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--line);
+}
+
+.patient-progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s var(--ease);
+}
+
+.patient-card {
+  width: min(680px, 100%);
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.patient-eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* One question fills the card, so it reads as the only thing being asked. */
+.patient-card h1 {
+  margin: 0 0 12px;
+  font-size: 26px;
+  line-height: 1.3;
+}
+
+.patient-question {
+  font-size: 24px;
+}
+
+.patient-lead {
+  margin: 0 0 12px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.patient-note {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.patient-answer {
+  margin-top: 14px;
+  font-size: 16px;
+}
+
+.patient-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn-lg {
+  padding: 10px 22px;
+  font-size: 15px;
+}
+
+.patient-done {
+  text-align: center;
+}
+
+.tick {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--good);
+  color: var(--paper);
+  font-size: 28px;
+}
+
+/* --- hold to speak --- */
+
+.speak {
+  margin-top: 18px;
+}
+
+/* Above the answer, so the meter is between the question and the words it
+   is producing. */
+.eq-speak {
+  height: 40px;
+  gap: 3px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper-2);
+}
+
+.speak-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.mic {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink-2);
+  cursor: pointer;
+  touch-action: none;
+  transition: transform 0.12s var(--ease), background 0.18s var(--ease);
+}
+
+.mic svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mic:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mic.is-live {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper);
+  transform: scale(1.06);
+}
+
+.speak-hint {
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 560px) {
+  .patient-card {
+    padding: 22px 18px;
+  }
+
+  .patient-card h1 {
+    font-size: 22px;
+  }
+}
+
+.patient-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-edge);
+  font-size: 13px;
+  color: var(--accent-ink);
+}
+
+/* --- case header identity ------------------------------------------------ */
+
+.case-head-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.case-head-urgent {
+  /* Sits beside the age and gender, so it does not need the full weight of a
+     table badge. */
+  font-size: 10px;
+}
+
+.summary-box-urgency {
+  border-color: var(--line-2);
+  background: var(--paper-2);
+}
+
+.urgency-line {
+  margin-bottom: 8px;
+}
+
+/* --- flag counts on the caseload list --- */
+
+.flag-counts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* The referrer line sits under the identity line, quieter than it. */
+.case-head-referrer {
+  font-size: 12px;
+}
+
+/* --- my today ------------------------------------------------------------ */
+
+.today-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.today-picker .field-label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.today-picker .input {
+  width: auto;
+  min-width: 200px;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stat {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper-2);
+}
+
+.stat-value {
+  display: block;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stat-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* A day with flagged cases in it should not read the same as a quiet one. */
+.stat-alert {
+  border-color: #f0c3bf;
+  background: #fdeceb;
+}
+
+.stat-alert .stat-value {
+  color: #b3483f;
+}
+
+.today-sub {
+  margin-top: 22px;
+}
+
+.today-empty {
+  margin-top: 16px;
+  color: var(--ink-3);
 }

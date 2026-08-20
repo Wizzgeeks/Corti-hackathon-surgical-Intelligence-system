@@ -20,7 +20,6 @@
           "current_role": "GP",
           "organization": "Bryndwr Medical Rooms"
         },
-        "allergies": "NA",
         "referred_to_consultant": "Mr Ram Chandru",
         "case_summary": "",
         "flags": "",
@@ -66,7 +65,6 @@ EXTRACTED_FIELDS: tuple[str, ...] = (
     "patient_age",
     "patient_gender",
     "patient_contact",
-    "allergies",
     "referred_to_consultant",
 )
 DEFERRED_FIELDS: tuple[str, ...] = (
@@ -116,7 +114,6 @@ class TriageResult(BaseModel):
     patient_gender: str = ""
     patient_contact: str = ""
     referred_by: Referrer = Field(default_factory=Referrer)
-    allergies: str = ""
     referred_to_consultant: str = ""
     case_summary: str = ""
     flags: str = ""

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import BookAppointmentDialog from '../components/BookAppointmentDialog.jsx'
-import ConsultantRequests from '../components/ConsultantRequests.jsx'
 import Investigations from '../components/Investigations.jsx'
 import RecordConsultationDialog from '../components/RecordConsultationDialog.jsx'
 import ConsultationSummaryField from '../components/ConsultationSummaryField.jsx'
@@ -10,9 +9,9 @@ import {
   createCase,
   deleteCase,
   getCaseDetail,
+  patientFormLink,
+  reconcileQuestionnaire,
   onCaseReassessed,
-  createConsultantRequest,
-  updateConsultantRequest,
   loadLatestCase,
   saveLatestCase,
   updateAppointment,
@@ -155,6 +154,8 @@ function CaseDetail({ isNew = false }) {
   const [booking, setBooking] = useState(false)
   const [recording, setRecording] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [reconciling, setReconciling] = useState(false)
   const [consultations, setConsultations] = useState([])
   const [activeTab, setActiveTab] = useState(null)
 
@@ -271,6 +272,23 @@ function CaseDetail({ isNew = false }) {
   const setField = (key, value) =>
     setDraft((prev) => ({ ...prev, [key]: value }))
 
+  /** Send the answers and the current background to Corti, and take back one
+   *  merged brief. The page is refetched so the new background is what is on
+   *  screen, rather than a copy of it held here. */
+  const reconcile = async () => {
+    setSaveError('')
+    setReconciling(true)
+    try {
+      const result = await reconcileQuestionnaire(record.case_id)
+      if (result?.errors?.length) setSaveError(result.errors.join(' '))
+      await loadCase({ keepTab: true })
+    } catch (exc) {
+      setSaveError(exc.message)
+    } finally {
+      setReconciling(false)
+    }
+  }
+
   /** Delete the case and everything attached to it, then leave the page —
    *  there is nothing here to come back to. */
   const removeCase = async () => {
@@ -339,6 +357,38 @@ function CaseDetail({ isNew = false }) {
           </span>
           <div className="case-head-text">
             <h2>{details.patient_name}</h2>
+            {/* Who the case is about, at a glance — the detail below is for
+                reading, this is for knowing whose notes are open. */}
+            <p className="case-head-sub">
+              {[
+                details.patient_age,
+                details.patient_gender,
+                details.patient_contact,
+              ]
+                .map((part) => (part ?? '').trim())
+                .filter(Boolean)
+                .join(' · ') || '—'}
+              {details.is_urgent && (
+                <span className="sev sev-high case-head-urgent">Urgent</span>
+              )}
+            </p>
+            {/* Who sent the case — reference rather than clinical content, so
+                it belongs beside the name and not in the body. */}
+            {(details.referrer_name ||
+              details.referrer_role ||
+              details.referrer_organization) && (
+              <p className="case-head-sub case-head-referrer">
+                Referred by{' '}
+                {[
+                  details.referrer_name,
+                  details.referrer_role,
+                  details.referrer_organization,
+                ]
+                  .map((part) => (part ?? '').trim())
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            )}
           </div>
           <div className="case-head-tags">
             {editing ? (
@@ -367,6 +417,23 @@ function CaseDetail({ isNew = false }) {
                 >
                   Edit
                 </button>
+                {/* The patient's own form. Copied rather than opened: it is
+                    sent to them, not used from here. */}
+                {!isNew && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={async () => {
+                      await navigator.clipboard?.writeText(
+                        patientFormLink(record.case_id),
+                      )
+                      setLinkCopied(true)
+                      setTimeout(() => setLinkCopied(false), 2000)
+                    }}
+                  >
+                    {linkCopied ? 'Link copied' : 'Copy patient form link'}
+                  </button>
+                )}
                 {/* A case that has not been saved yet has nothing to delete. */}
                 {!isNew && (
                   <button
@@ -382,6 +449,29 @@ function CaseDetail({ isNew = false }) {
             )}
           </div>
         </div>
+
+        {!isNew && details.patient_recording_completed && (
+          <div className="patient-status">
+            <span>
+              Patient questionnaire completed
+              {details.patient_recording_reconciled
+                ? ' and reconciled into the clinical background.'
+                : ' — not yet reconciled into the case.'}
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={reconciling}
+              onClick={reconcile}
+            >
+              {reconciling
+                ? 'Reconciling…'
+                : details.patient_recording_reconciled
+                  ? 'Reconcile again'
+                  : 'Reconcile'}
+            </button>
+          </div>
+        )}
 
         {saveError && (
           <p className="form-error" role="alert">
@@ -416,12 +506,6 @@ function CaseDetail({ isNew = false }) {
                   label="Contact"
                   name="patient_contact"
                   value={draft.patient_contact}
-                  onChange={setField}
-                />
-                <EditField
-                  label="Allergies"
-                  name="allergies"
-                  value={draft.allergies}
                   onChange={setField}
                 />
                 {/* Prose, not a value: the referral's facts as Corti grouped
@@ -465,42 +549,8 @@ function CaseDetail({ isNew = false }) {
           </div>
         ) : (
           <div className="case-read">
-            {/* One facts strip: these are all short values, so stacking them
-                into narrow columns only made the page taller. */}
-            <dl className="facts">
-              <div>
-                <dt>Age</dt>
-                <dd>{details.patient_age || '—'}</dd>
-              </div>
-              <div>
-                <dt>Gender</dt>
-                <dd>{details.patient_gender || '—'}</dd>
-              </div>
-              <div>
-                <dt>Contact</dt>
-                <dd>{details.patient_contact || '—'}</dd>
-              </div>
-              <div>
-                <dt>Allergies</dt>
-                <dd>{details.allergies || '—'}</dd>
-              </div>
-              <div>
-                <dt>Referrer</dt>
-                <dd>
-                  {details.referrer_name || '—'}
-                  {details.referrer_role ? ` · ${details.referrer_role}` : ''}
-                  {details.referrer_organization
-                    ? ` · ${details.referrer_organization}`
-                    : ''}
-                </dd>
-              </div>
-            </dl>
-
-            <div className="summary-box">
-              <h3 className="detail-title">Clinical background</h3>
-              <Clamped text={details.clinical_background} />
-            </div>
-
+            {/* What a clinician opens the case to read comes first; the
+                identifying detail below it is reference, not the point. */}
             {!isNew && (
               <>
                 <div className="prose-pair">
@@ -514,22 +564,29 @@ function CaseDetail({ isNew = false }) {
                   </section>
                 </div>
 
-                <FlagList flags={details.flags_list} fallback={details.flags} />
-
-                {/* Keyed on the case so switching cases rebuilds the local
-                    draft list rather than carrying the last one over. */}
-                <ConsultantRequests
-                  key={record.case_id}
-                  requests={details.consultant_requests ?? []}
-                  onCreate={(text) =>
-                    createConsultantRequest(record.case_id, text)
-                  }
-                  onUpdate={(requestId, changes) =>
-                    updateConsultantRequest(record.case_id, requestId, changes)
-                  }
-                />
+                <div className="prose-pair">
+                  <FlagList flags={details.flags_list} fallback={details.flags} />
+                  <section className="summary-box summary-box-urgency">
+                    <h3 className="detail-title">Urgency</h3>
+                    <p className="summary-text urgency-line">
+                      <span
+                        className={`sev sev-${details.is_urgent ? 'high' : 'low'}`}
+                      >
+                        {details.is_urgent ? 'Urgent' : 'Routine'}
+                      </span>
+                    </p>
+                    {details.urgency_reason && (
+                      <Clamped text={details.urgency_reason} lines={4} />
+                    )}
+                  </section>
+                </div>
               </>
             )}
+
+            <div className="summary-box">
+              <h3 className="detail-title">Clinical background</h3>
+              <Clamped text={details.clinical_background} />
+            </div>
           </div>
         )}
       </section>

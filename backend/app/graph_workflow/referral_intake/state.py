@@ -82,7 +82,6 @@ class IntakeState(TypedDict, total=False):
     patient_gender: str  # case_data_extractor
     patient_contact: str  # case_data_extractor
     referred_by: dict[str, str]  # case_data_extractor (name, role, organisation)
-    allergies: str  # case_data_extractor
     referred_to_consultant: str  # case_data_extractor — who the letter names
     case_summary: str  # case_summariser
     flags: str  # clinical_flag_detector

@@ -254,17 +254,6 @@ async def full_case_record(case_id: str) -> dict[str, Any]:
             }
             for doc in investigations
         ],
-        "requests": [
-            {
-                **entry,
-                "request": entry.get("consultant_requests") or "",
-                "response": entry.get("response") or "",
-                # An unanswered request has no response time; fall back to
-                # when it was asked so the entry is still orderable.
-                "updated_at": entry.get("responded_time") or entry.get("request_time"),
-            }
-            for entry in (case.get("consultant_requests") or [])
-        ],
         "consultation": [
             _consultation_view(doc, by_appointment, teams) for doc in consultations
         ],

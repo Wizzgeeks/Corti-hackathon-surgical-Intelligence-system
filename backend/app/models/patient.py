@@ -11,5 +11,4 @@ class Patient(MongoModel):
     clinical_background: str | None = None
     gender: str
     contact: str
-    allergies: str
     

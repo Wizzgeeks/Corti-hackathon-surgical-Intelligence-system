@@ -5,6 +5,32 @@ import { listCases } from '../lib/api.js'
 
 const PAGE_SIZE = 20
 
+/** Flag counts, most serious first.
+ *
+ *  Low flags are deliberately not shown: on a caseload table they are noise,
+ *  and a row with nothing on it reads as "nothing to worry about" — which is
+ *  what a low flag means. Critical is shown with high, in red, because a
+ *  critical flag is the one thing that must never be hidden here. */
+function FlagCounts({ counts }) {
+  const shown = [
+    { key: 'critical', label: 'Critical', tone: 'high' },
+    { key: 'high', label: 'High', tone: 'high' },
+    { key: 'medium', label: 'Medium', tone: 'medium' },
+  ].filter((entry) => (counts?.[entry.key] ?? 0) > 0)
+
+  if (shown.length === 0) return <span className="cell-sub">—</span>
+
+  return (
+    <span className="flag-counts">
+      {shown.map((entry) => (
+        <span key={entry.key} className={`sev sev-${entry.tone}`}>
+          {entry.label} {counts[entry.key]}
+        </span>
+      ))}
+    </span>
+  )
+}
+
 function Cases() {
   const navigate = useNavigate()
   const [result, setResult] = useState(null)
@@ -62,6 +88,8 @@ function Cases() {
                 <th scope="col">Patient name</th>
                 <th scope="col">Gender</th>
                 <th scope="col">Age</th>
+                <th scope="col">Urgency</th>
+                <th scope="col">Flags</th>
               </tr>
             </thead>
             <tbody>
@@ -88,9 +116,7 @@ function Cases() {
                           {row.patient_name || '—'}
                         </span>
                         <br />
-                        <span className="cell-sub">
-                          {row.is_urgent ? 'Urgent' : row.status || '—'}
-                        </span>
+                        <span className="cell-sub">{row.status || '—'}</span>
                       </span>
                     </div>
                   </td>
@@ -98,6 +124,16 @@ function Cases() {
                     <span className="tag">{row.patient_gender || '—'}</span>
                   </td>
                   <td className="num">{row.patient_age || '—'}</td>
+                  <td>
+                    {row.is_urgent ? (
+                      <span className="sev sev-high">Urgent</span>
+                    ) : (
+                      <span className="cell-sub">Routine</span>
+                    )}
+                  </td>
+                  <td>
+                    <FlagCounts counts={row.flag_counts} />
+                  </td>
                 </tr>
               ))}
             </tbody>

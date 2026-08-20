@@ -84,7 +84,8 @@ async def build_case_state(case_id: str) -> dict[str, Any]:
         "patient_name": (patient or {}).get("name", ""),
         "patient_age": str((patient or {}).get("age", "") or ""),
         "patient_gender": (patient or {}).get("gender", ""),
-        "allergies": (patient or {}).get("allergies", ""),
+        # Allergies are part of the background now, not a field of their own.
+        "clinical_background": (patient or {}).get("clinical_background") or "",
         # The Mongo records every agent sends to Corti as context.
         "case_document": case,
         "appointment_documents": appointments,

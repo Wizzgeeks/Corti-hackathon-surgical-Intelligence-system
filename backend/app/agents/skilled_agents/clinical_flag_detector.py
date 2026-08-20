@@ -53,8 +53,10 @@ class ClinicalFlagDetector(Agent):
         parts = [*case_context_blocks(state), state.get("referral_transcription") or state.get("referral_text") or ""]
         if state.get("case_summary"):
             parts.append(f"Case summary: {state['case_summary']}")
-        if state.get("allergies"):
-            parts.append(f"Allergies: {state['allergies']}")
+        # Allergies used to be passed separately; they are part of the
+        # clinical background now, which carries the rest of the history too.
+        if state.get("clinical_background"):
+            parts.append(f"Clinical background: {state['clinical_background']}")
         return "\n\n".join(p for p in parts if p)
 
     async def run(self, state: AgentState) -> dict:

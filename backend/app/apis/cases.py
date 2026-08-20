@@ -14,7 +14,6 @@ into `patients`, the case into `cases`, linked by id.
           "age": 49,
           "gender": "Female",
           "contact": "",
-          "allergies": "NA"
         },
         "referrer": {
           "name": "Andie Fulton",
@@ -69,8 +68,7 @@ into `patients`, the case into `cases`, linked by id.
             "age": 49,
             "gender": "Female",
             "contact": "",
-            "allergies": "NA"
-          },
+            },
           "consultant": {
                   "name": "Orthopaedics",
             "speciality": "Orthopaedics"
@@ -155,7 +153,7 @@ from app.models import consultation as consultation_model
 from app.models import investigation as investigation_model
 from app.models import patient as patient_model
 from app.models import surgery as surgery_model
-from app.models.case import Case, ConsultantRequest, Flag, Referred_by
+from app.models.case import Case, Flag, Referred_by
 from app.models.common import utcnow
 from app.models.enums import CaseStatus, FlagSeverity
 from app.models.patient import Patient
@@ -174,7 +172,6 @@ class PatientDetails(BaseModel):
     age: int = Field(ge=0, le=130)
     gender: str = ""
     contact: str = ""
-    allergies: str = ""
     clinical_background: str | None = None
 
 
@@ -190,7 +187,6 @@ class CaseDetails(BaseModel):
     recommendation: str = ""
     pre_consultation_details: str = ""
     notes: str = ""
-    consultant_requests: list[ConsultantRequest] = Field(default_factory=list)
     symptoms: list[str] = Field(default_factory=list)
     is_urgent: bool = False
     urgency_reason: str | None = None
@@ -216,31 +212,6 @@ class CreateCaseResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-def stamp_consultant_requests(
-    requests: list[ConsultantRequest] | None,
-) -> list[ConsultantRequest]:
-    """Apply the request/response timestamps the client does not set.
-
-    The times are the record of when the exchange happened, so they are set
-    here rather than trusted from the browser: a new request is stamped on
-    arrival, and a response is stamped the first time it carries text.
-    Clearing a response clears its time again, so an unanswered request never
-    keeps a stale one.
-    """
-    stamped: list[ConsultantRequest] = []
-    for request in requests or []:
-        item = request.model_copy()
-        if item.request_time is None:
-            item.request_time = utcnow()
-        if (item.response or "").strip():
-            if item.responded_time is None:
-                item.responded_time = utcnow()
-        else:
-            item.responded_time = None
-        stamped.append(item)
-    return stamped
-
-
 def build_flags(text: str) -> list[Flag]:
     """Wrap the form's free-text flags as a single `Flag`."""
     text = (text or "").strip()
@@ -263,7 +234,6 @@ async def create_case(payload: CreateCaseRequest) -> CreateCaseResponse:
         age=payload.patient.age,
         gender=payload.patient.gender,
         contact=payload.patient.contact,
-        allergies=payload.patient.allergies,
         clinical_background=payload.patient.clinical_background,
     )
     patient_result = await get_collection(patient_model.COLLECTION).insert_one(
@@ -291,9 +261,6 @@ async def create_case(payload: CreateCaseRequest) -> CreateCaseResponse:
         recommendation=payload.case.recommendation or None,
         pre_consultation_details=payload.case.pre_consultation_details or None,
         notes=payload.case.notes or None,
-        consultant_requests=stamp_consultant_requests(
-            payload.case.consultant_requests
-        ),
         is_urgent=payload.case.is_urgent,
         urgency_reason=payload.case.urgency_reason,
     )
@@ -335,7 +302,6 @@ class PatientSummary(BaseModel):
     age: int | None = None
     gender: str = ""
     contact: str = ""
-    allergies: str = ""
     clinical_background: str | None = None
 
 
@@ -351,12 +317,15 @@ class CaseSummary(BaseModel):
     case_id: str
     status: str = ""
     is_urgent: bool = False
+    # Whether the patient has filled in the public questionnaire, and whether
+    # a clinician has since worked those answers into the case.
+    patient_recording_completed: bool = False
+    patient_recording_reconciled: bool = False
     urgency_reason: str | None = None
     case_summary: str | None = None
     recommendation: str | None = None
     pre_consultation_details: str | None = None
     notes: str | None = None
-    consultant_requests: list[ConsultantRequest] = Field(default_factory=list)
     flags: list[Flag] = Field(default_factory=list)
     symptoms: list[str] = Field(default_factory=list)
     referred_by: list[Referred_by] = Field(default_factory=list)
@@ -421,12 +390,13 @@ def to_case_summary(doc: dict, patient: dict | None) -> dict:
         "case_id": _oid(doc.get("_id")),
         "status": doc.get("status", ""),
         "is_urgent": doc.get("is_urgent", False),
+        "patient_recording_completed": doc.get("patient_recording_completed", False),
+        "patient_recording_reconciled": doc.get("patient_recording_reconciled", False),
         "urgency_reason": doc.get("urgency_reason"),
         "case_summary": doc.get("case_summary"),
         "recommendation": doc.get("recommendation"),
         "pre_consultation_details": doc.get("pre_consultation_details"),
         "notes": doc.get("notes"),
-        "consultant_requests": doc.get("consultant_requests") or [],
         "flags": doc.get("flags") or [],
         "symptoms": doc.get("symptoms") or [],
         "referred_by": doc.get("referred_by") or [],
@@ -437,7 +407,6 @@ def to_case_summary(doc: dict, patient: dict | None) -> dict:
                 "age": patient.get("age"),
                 "gender": patient.get("gender", ""),
                 "contact": patient.get("contact", ""),
-                "allergies": patient.get("allergies", ""),
                 "clinical_background": patient.get("clinical_background"),
             }
             if patient
@@ -593,7 +562,6 @@ class PatientPatch(BaseModel):
     age: int | None = Field(default=None, ge=0, le=130)
     gender: str | None = None
     contact: str | None = None
-    allergies: str | None = None
     clinical_background: str | None = None
 
 
@@ -611,7 +579,6 @@ class CasePatch(BaseModel):
     pre_consultation_details: str | None = None
     notes: str | None = None
     # Replaces the whole list — read the case, append, send it back.
-    consultant_requests: list[ConsultantRequest] | None = None
     symptoms: list[str] | None = None
     is_urgent: bool | None = None
     urgency_reason: str | None = None
@@ -682,14 +649,6 @@ async def update_case(case_id: str, payload: UpdateCaseRequest) -> UpdateCaseRes
                 case_update["flags"] = [
                     f if isinstance(f, dict) else f.model_dump() for f in flags
                 ]
-
-        if "consultant_requests" in sent:
-            sent["consultant_requests"] = [
-                item.model_dump()
-                for item in stamp_consultant_requests(
-                    payload.case.consultant_requests
-                )
-            ]
 
         if "status" in sent and sent["status"] is not None:
             sent["status"] = CaseStatus(sent["status"]).value

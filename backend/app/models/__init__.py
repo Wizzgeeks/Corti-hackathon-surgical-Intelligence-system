@@ -13,6 +13,7 @@ from app.models.enums import (
     InvestigationStatus,
 )
 from app.models.patient import Patient
+from app.models.patient_questionnaire import PatientQuestionnaire
 from app.models.surgery import Surgery
 
 __all__ = [
@@ -30,6 +31,7 @@ __all__ = [
     "InvestigationStatus",
     "MongoModel",
     "Patient",
+    "PatientQuestionnaire",
     "PyObjectId",
     "Surgery",
     "utcnow",

@@ -31,7 +31,6 @@ def empty_result() -> dict:
         "patient_age": "",
         "patient_gender": "",
         "patient_contact": "",
-        "allergies": "",
         "referred_to_consultant": "",
         "referred_by": empty_referrer(),
     }
@@ -96,10 +95,6 @@ def map_response(response: dict[str, Any]) -> dict[str, str]:
     result["patient_age"] = "" if age in (None, "") else str(age)
     result["patient_gender"] = str(fields.get("gender") or "").strip()
     result["patient_contact"] = str(fields.get("contact") or "").strip()
-    # Corti's template spells this "allerigies"; accept either spelling so a
-    # template fix later doesn't silently blank the field.
-    allergies = fields.get("allergies") or fields.get("allerigies")
-    result["allergies"] = str(allergies or "").strip()
     result["referred_by"] = normalise_referrer(fields.get("referred_by"))
     # The consultant the letter is addressed to — distinct from the team the
     # assigner recommends later in the pipeline.
@@ -128,7 +123,6 @@ class CaseDataExtractor(Agent):
             "patient_gender",
             "patient_contact",
             "referred_by",
-            "allergies",
             "contact"
         ),
     )

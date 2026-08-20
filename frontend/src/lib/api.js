@@ -25,7 +25,6 @@ export const CASE_FIELDS = [
   'patient_age',
   'patient_gender',
   'patient_contact',
-  'allergies',
   'clinical_background',
   'referrer_name',
   'referrer_role',
@@ -45,7 +44,7 @@ export const emptyCase = () =>
   Object.fromEntries(CASE_FIELDS.map((key) => [key, '']))
 
 /** Flatten one API value to the string the form controls edit.
- *  List-valued fields (allergies, flags) arrive as arrays; joining keeps
+ *  List-valued fields (flags) arrive as arrays; joining keeps
  *  them editable as one line and readable in the detail view. */
 const toText = (value) => {
   if (value == null) return ''
@@ -149,7 +148,6 @@ export const toCasePayload = (record) => ({
     age: asAge(record.patient_age),
     gender: record.patient_gender ?? '',
     contact: record.patient_contact ?? '',
-    allergies: record.allergies ?? '',
     clinical_background: record.clinical_background ?? '',
   },
   referrer: {
@@ -219,6 +217,18 @@ const formatFlags = (value) => {
     .join('\n')
 }
 
+/** How many flags of each severity, for the at-a-glance counts on the list.
+ *  Anything without a severity is counted as low — the least alarming
+ *  reading, since guessing it is worse than the flag simply not saying. */
+export const severityCounts = (flags) => {
+  const counts = { critical: 0, high: 0, medium: 0, low: 0 }
+  for (const flag of Array.isArray(flags) ? flags : []) {
+    const severity = String(flag?.severity ?? '').toLowerCase()
+    counts[severity in counts ? severity : 'low'] += 1
+  }
+  return counts
+}
+
 /** One row of GET /cases, flattened for the caseload table. */
 export const normaliseCaseRow = (row) => {
   const patient = row?.patient ?? {}
@@ -226,6 +236,8 @@ export const normaliseCaseRow = (row) => {
     case_id: row?.case_id ?? '',
     status: toText(row?.status),
     is_urgent: Boolean(row?.is_urgent),
+    urgency_reason: toText(row?.urgency_reason),
+    flag_counts: severityCounts(row?.flags),
     patient_name: toText(patient.name),
     patient_age: toText(patient.age),
     patient_gender: toText(patient.gender),
@@ -286,17 +298,15 @@ export const normaliseCaseDetail = (data) => {
     patient_age: toText(patient.age),
     patient_gender: toText(patient.gender),
     patient_contact: toText(patient.contact),
-    allergies: toText(patient.allergies),
     clinical_background: toText(patient.clinical_background),
     referrer_name: toText(referrer.name),
     referrer_role: toText(referrer.role ?? referrer.current_role),
     referrer_organization: toText(referrer.organization),
+    patient_recording_completed: Boolean(data?.patient_recording_completed),
+    patient_recording_reconciled: Boolean(data?.patient_recording_reconciled),
     case_summary: toText(data?.case_summary),
     pre_consultation_details: toText(data?.pre_consultation_details),
     notes: toText(data?.notes),
-    consultant_requests: (data?.consultant_requests ?? []).map(
-      normaliseConsultantRequest,
-    ),
     flags: formatFlags(data?.flags),
     // Structured form, so the page can list flags with their severity
     // instead of rendering one paragraph.
@@ -341,65 +351,6 @@ const formatDate = (value) => {
   ].join('/')
 }
 
-/** One consultant request, with its two server-set times pre-formatted. */
-export const normaliseConsultantRequest = (item, index) => ({
-  request_id: item?.request_id ?? `r${index + 1}`,
-  consultant_requests: toText(item?.consultant_requests),
-  response: toText(item?.response),
-  request_time: item?.request_time ?? null,
-  responded_time: item?.responded_time ?? null,
-  request_time_text: formatDateTime(item?.request_time),
-  responded_time_text: formatDateTime(item?.responded_time),
-})
-
-const requestsUrl = (caseId, requestId) =>
-  `${BASE_URL}${CASES_PATH}/${encodeURIComponent(caseId)}/consultant_requests` +
-  (requestId ? `/${encodeURIComponent(requestId)}` : '')
-
-export async function listConsultantRequests(caseId) {
-  const data = await request('GET', requestsUrl(caseId), {
-    what: 'Loading consultant requests',
-  })
-  return (data?.consultant_requests ?? []).map(normaliseConsultantRequest)
-}
-
-/** Raise a new request. The server stamps `request_time`. */
-export async function createConsultantRequest(caseId, text) {
-  const created = normaliseConsultantRequest(
-    await request('POST', requestsUrl(caseId), {
-      body: { consultant_requests: text ?? '' },
-      what: 'Saving the request',
-    }),
-    0,
-  )
-  reassessInBackground(caseId)
-  return created
-}
-
-/** Save one side of an existing request — the request text or the response,
- *  never both. Each has its own Save button, and sending only the edited
- *  field is what keeps the other one's timestamp untouched. */
-export async function updateConsultantRequest(caseId, requestId, changes) {
-  const updated = normaliseConsultantRequest(
-    await request('PATCH', requestsUrl(caseId, requestId), {
-      body: changes,
-      what: 'response' in changes ? 'Saving the response' : 'Saving the request',
-    }),
-    0,
-  )
-  // A consultant's answer is new clinical input, not just bookkeeping.
-  reassessInBackground(caseId)
-  return updated
-}
-
-export async function deleteConsultantRequest(caseId, requestId) {
-  const result = await request('DELETE', requestsUrl(caseId, requestId), {
-    what: 'Deleting the request',
-  })
-  reassessInBackground(caseId)
-  return result
-}
-
 /** ISO timestamp -> "dd/mm/yyyy HH:MM", blank when absent. */
 const formatDateTime = (value) => {
   if (!value) return ''
@@ -422,7 +373,6 @@ export const PATCH_FIELD_MAP = {
   patient_age: ['patient', 'age'],
   patient_gender: ['patient', 'gender'],
   patient_contact: ['patient', 'contact'],
-  allergies: ['patient', 'allergies'],
   clinical_background: ['patient', 'clinical_background'],
   referrer_name: ['referrer', 'name'],
   referrer_role: ['referrer', 'role'],
@@ -886,6 +836,72 @@ function reassessInBackground(caseId) {
     // Already announced to subscribers; nothing further to do here.
   })
 }
+
+// --- my today -------------------------------------------------------------
+
+/** One team's day in counts. `date` is a local YYYY-MM-DD; omitting it lets
+ *  the server use its own today. */
+export async function getTodaySummary(consultantTeamId, date) {
+  const data = await request(
+    'GET',
+    url('/today', { consultant_team_id: consultantTeamId, date }),
+    { what: "Loading today's summary" },
+  )
+  return {
+    cases: data?.cases ?? 0,
+    consultations: data?.consultations ?? 0,
+    surgeries: data?.surgeries ?? 0,
+    new_consultations: data?.new_consultations ?? 0,
+    follow_up_consultations: data?.follow_up_consultations ?? 0,
+    post_surgery_consultations: data?.post_surgery_consultations ?? 0,
+    high_flag_cases: data?.high_flag_cases ?? 0,
+  }
+}
+
+// --- patient questionnaire (public) ---------------------------------------
+
+const questionnaireUrl = (caseId) =>
+  `${BASE_URL}/public/cases/${encodeURIComponent(caseId)}/questionnaire`
+
+/** The public form: who referred the patient, and what to ask them. */
+export async function getPatientQuestionnaire(caseId) {
+  const data = await request('GET', questionnaireUrl(caseId), {
+    what: 'Loading the form',
+  })
+  return {
+    case_id: data?.case_id ?? '',
+    patient_name: toText(data?.patient_name),
+    referred_by: toText(data?.referred_by),
+    completed: Boolean(data?.completed),
+    questions: (data?.questions ?? []).map((item) => ({
+      order: item?.order ?? 0,
+      question: toText(item?.question),
+    })),
+  }
+}
+
+/** Submit the answers. Answering again replaces the previous set. */
+export async function submitPatientQuestionnaire(caseId, answers) {
+  return request('POST', questionnaireUrl(caseId), {
+    body: { answers },
+    what: 'Submitting your answers',
+  })
+}
+
+/** Fold the patient's answers into the clinical background: Corti re-reads
+ *  the answers together with the background already on file and the facts it
+ *  returns replace it. */
+export async function reconcileQuestionnaire(caseId) {
+  return request(
+    'POST',
+    `${BASE_URL}${CASES_PATH}/${encodeURIComponent(caseId)}/questionnaire/reconcile`,
+    { what: 'Reconciling the questionnaire' },
+  )
+}
+
+/** The link a patient is sent. Absolute, so it can be copied straight out. */
+export const patientFormLink = (caseId) =>
+  `${window.location.origin}/questionnaire/${encodeURIComponent(caseId)}`
 
 export function saveLatestCase(record) {
   try {

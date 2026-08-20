@@ -7,11 +7,19 @@ import CaseDetail from './pages/CaseDetail.jsx'
 import Team from './pages/Team.jsx'
 import Contacts from './pages/Contacts.jsx'
 import NewReferral from './pages/NewReferral.jsx'
+import PatientQuestionnaire from './pages/PatientQuestionnaire.jsx'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Outside the app layout on purpose: a patient opening this link
+            gets the questionnaire and nothing else — no nav, no case data. */}
+        <Route
+          path="questionnaire/:caseId"
+          element={<PatientQuestionnaire />}
+        />
+
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/today" replace />} />
           <Route path="today" element={<MyToday />} />

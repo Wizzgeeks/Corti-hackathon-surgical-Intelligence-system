@@ -24,6 +24,7 @@ from app.models import (
     investigation,
     contact,
     patient,
+    patient_questionnaire,
     surgery,
 )
 
@@ -40,6 +41,9 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     patient.COLLECTION: [
         IndexModel([("name", ASCENDING)]),
+    ],
+    patient_questionnaire.COLLECTION: [
+        IndexModel([("case", ASCENDING), ("order", ASCENDING)]),
     ],
     case.COLLECTION: [
         IndexModel([("patient", ASCENDING)]),
