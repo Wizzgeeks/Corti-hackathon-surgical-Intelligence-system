@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     corti_agent_client_id: str = ""
     corti_agent_client_secret: str = ""
 
+    # --- ElevenLabs (text to speech) ---
+    elevenlabs_api_key: str = ""
+    # Flash is the low-latency model; the briefing is read on the way in, so
+    # waiting on a slower one would defeat the point.
+    elevenlabs_model_id: str = "eleven_flash_v2_5"
+    # A voice the account can actually use — the shared library is not
+    # available on every plan.
+    elevenlabs_voice_id: str = "JBFqnCBsd6RMkjVDRZzb"
+    elevenlabs_base_url: str = "https://api.elevenlabs.io/v1"
+
     # Template behind the case data extraction document.
     corti_case_extraction_template_id: str = "c7047d5d-eb7d-4a5b-99c0-70d7d66ed6c0"
 

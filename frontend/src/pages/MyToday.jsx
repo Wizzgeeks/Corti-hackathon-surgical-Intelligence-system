@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import SpokenBriefing from '../components/SpokenBriefing.jsx'
 import { getTodaySummary, listTeams } from '../lib/api.js'
 import { toKey } from '../lib/date.js'
+
+/** How each consultation is described in the list. */
+const TYPE_WORDS = {
+  new: 'New consultation',
+  follow_up: 'Follow-up',
+  post_surgery: 'Post-surgery',
+}
 
 /** One number and what it counts. */
 function Stat({ label, value, tone }) {
@@ -21,6 +30,7 @@ function Stat({ label, value, tone }) {
  * question and displays the answer.
  */
 function MyToday() {
+  const navigate = useNavigate()
   const [teams, setTeams] = useState([])
   const [teamId, setTeamId] = useState('')
   const [summary, setSummary] = useState(null)
@@ -127,6 +137,68 @@ function MyToday() {
               value={summary.post_surgery_consultations}
             />
           </div>
+
+          {/* The same day as prose. Read aloud on the way in, or scanned
+              here — the list below repeats it in a form you can click. */}
+          <section className="briefing">
+            <div className="panel-head">
+              <h3 className="detail-title">Today, out loud</h3>
+            </div>
+            <SpokenBriefing key={summary.summary_text} text={summary.summary_text} />
+          </section>
+
+          {summary.appointments.length > 0 && (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Time</th>
+                    <th scope="col">Patient</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Flags</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.appointments.map((item) => (
+                    <tr
+                      key={item.appointment_id}
+                      className={item.case_id ? 'row-link' : undefined}
+                      tabIndex={item.case_id ? 0 : undefined}
+                      onClick={() =>
+                        item.case_id && navigate(`/cases/${item.case_id}`)
+                      }
+                      onKeyDown={(event) => {
+                        if (!item.case_id) return
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          navigate(`/cases/${item.case_id}`)
+                        }
+                      }}
+                    >
+                      <td className="cell-strong">{item.time}</td>
+                      <td>
+                        {item.patient_name}
+                        <br />
+                        <span className="cell-sub">
+                          {[item.patient_age, item.patient_gender]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                      </td>
+                      <td>{TYPE_WORDS[item.category] ?? item.appointment_type}</td>
+                      <td>
+                        {item.has_high_flag ? (
+                          <span className="sev sev-high">High</span>
+                        ) : (
+                          <span className="cell-sub">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {summary.cases === 0 && (
             <p className="today-empty">Nothing booked for this consultant today.</p>

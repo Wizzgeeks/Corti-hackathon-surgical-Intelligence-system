@@ -2182,3 +2182,65 @@ button.block {
   margin-top: 16px;
   color: var(--ink-3);
 }
+
+.briefing {
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid var(--accent-edge);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.briefing > .panel-head {
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+}
+
+.briefing .summary-text {
+  line-height: 1.6;
+}
+
+.briefing-controls {
+  display: flex;
+  gap: 8px;
+}
+
+/* --- briefing player ----------------------------------------------------- */
+
+.briefing-player {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Driven by the audio itself, so it only moves when there is a voice. */
+.eq-briefing {
+  height: 38px;
+  gap: 3px;
+  padding: 0 6px;
+  border: 1px solid var(--accent-edge);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.briefing-text {
+  line-height: 1.7;
+}
+
+/* Each sentence is its own target: tapping one plays from there. */
+.briefing-sentence {
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.briefing-sentence:hover {
+  background: var(--paper-2);
+}
+
+.briefing-sentence.is-active {
+  background: var(--accent);
+  color: var(--paper);
+  box-shadow: 0 0 0 3px var(--accent);
+}

@@ -855,6 +855,42 @@ export async function getTodaySummary(consultantTeamId, date) {
     follow_up_consultations: data?.follow_up_consultations ?? 0,
     post_surgery_consultations: data?.post_surgery_consultations ?? 0,
     high_flag_cases: data?.high_flag_cases ?? 0,
+    summary_text: toText(data?.summary_text),
+    appointments: (data?.appointments ?? []).map((item) => ({
+      appointment_id: item?.appointment_id ?? '',
+      case_id: item?.case_id ?? '',
+      time: toText(item?.time),
+      appointment_type: toText(item?.appointment_type),
+      category: toText(item?.category),
+      patient_name: toText(item?.patient_name),
+      patient_age: toText(item?.patient_age),
+      patient_gender: toText(item?.patient_gender),
+      flags: item?.flags ?? [],
+      has_high_flag: Boolean(item?.has_high_flag),
+    })),
+  }
+}
+
+/** Read a briefing aloud through ElevenLabs.
+ *
+ *  Goes via our backend, not straight to ElevenLabs — the API key stays on
+ *  the server. Comes back with the audio and the timing of each sentence, so
+ *  the page can follow along as it plays. */
+export async function speakBriefing(text) {
+  const data = await request('POST', `${BASE_URL}/today/speech`, {
+    body: { text },
+    what: 'Preparing the audio',
+  })
+  return {
+    audio_base64: data?.audio_base64 ?? '',
+    duration_seconds: data?.duration_seconds ?? 0,
+    sentences: (data?.sentences ?? []).map((item) => ({
+      text: toText(item?.text),
+      start: item?.start ?? 0,
+      end: item?.end ?? 0,
+      start_seconds: item?.start_seconds ?? 0,
+      end_seconds: item?.end_seconds ?? 0,
+    })),
   }
 }
 
