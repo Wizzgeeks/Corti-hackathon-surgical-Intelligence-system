@@ -1,0 +1,41 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	chat_orchestrator(chat_orchestrator)
+	corti_authenticator(corti_authenticator)
+	referral_document_reader(referral_document_reader)
+	referral_document_classifier(referral_document_classifier)
+	case_data_extractor(case_data_extractor)
+	case_summariser(case_summariser)
+	urgency_assessor(urgency_assessor)
+	clinical_flag_detector(clinical_flag_detector)
+	next_action_recommender(next_action_recommender)
+	consultant_team_assigner(consultant_team_assigner)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> chat_orchestrator;
+	case_data_extractor --> chat_orchestrator;
+	case_summariser --> chat_orchestrator;
+	chat_orchestrator -.-> __end__;
+	chat_orchestrator -.-> case_data_extractor;
+	chat_orchestrator -.-> case_summariser;
+	chat_orchestrator -.-> clinical_flag_detector;
+	chat_orchestrator -.-> consultant_team_assigner;
+	chat_orchestrator -.-> corti_authenticator;
+	chat_orchestrator -.-> next_action_recommender;
+	chat_orchestrator -.-> referral_document_classifier;
+	chat_orchestrator -.-> referral_document_reader;
+	chat_orchestrator -.-> urgency_assessor;
+	clinical_flag_detector --> chat_orchestrator;
+	consultant_team_assigner --> chat_orchestrator;
+	corti_authenticator --> chat_orchestrator;
+	next_action_recommender --> chat_orchestrator;
+	referral_document_classifier --> chat_orchestrator;
+	referral_document_reader --> chat_orchestrator;
+	urgency_assessor --> chat_orchestrator;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

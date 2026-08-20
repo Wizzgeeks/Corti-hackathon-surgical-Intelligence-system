@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+motor
+python-multipart
+pydantic-settings
+python-dotenv
+pypdf
+httpx
+langgraph
+mcp

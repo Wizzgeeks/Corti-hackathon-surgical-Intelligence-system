@@ -1,0 +1,54 @@
+# ---------- secrets ----------
+.env
+.env.*
+!.env.example
+
+# ---------- node / frontend ----------
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+*.local
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- python / backend ----------
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.sqlite3
+*.db
+
+# ---------- editors / os ----------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.sw?
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ---------- misc ----------
+*.pem
+.cache/
+tmp/

@@ -1,0 +1,38 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	referral_orchestrator(referral_orchestrator)
+	corti_authenticator(corti_authenticator)
+	referral_document_reader(referral_document_reader)
+	case_data_extractor(case_data_extractor)
+	case_summariser(case_summariser)
+	clinical_flag_detector(clinical_flag_detector)
+	urgency_assessor(urgency_assessor)
+	consultant_team_assigner(consultant_team_assigner)
+	next_action_recommender(next_action_recommender)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> referral_orchestrator;
+	case_data_extractor --> referral_orchestrator;
+	case_summariser --> referral_orchestrator;
+	clinical_flag_detector --> referral_orchestrator;
+	consultant_team_assigner --> referral_orchestrator;
+	corti_authenticator --> referral_orchestrator;
+	next_action_recommender --> referral_orchestrator;
+	referral_document_reader --> referral_orchestrator;
+	referral_orchestrator -.-> __end__;
+	referral_orchestrator -.-> case_data_extractor;
+	referral_orchestrator -.-> case_summariser;
+	referral_orchestrator -.-> clinical_flag_detector;
+	referral_orchestrator -.-> consultant_team_assigner;
+	referral_orchestrator -.-> corti_authenticator;
+	referral_orchestrator -.-> next_action_recommender;
+	referral_orchestrator -.-> referral_document_reader;
+	referral_orchestrator -.-> urgency_assessor;
+	urgency_assessor --> referral_orchestrator;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

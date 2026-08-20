@@ -1,0 +1,70 @@
+# Backend-specific ignores. Repo-wide rules live in ../.gitignore;
+# these are repeated here so this directory is safe on its own too.
+
+# ---------- secrets ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# ---------- runtime data ----------
+# Uploaded referral PDFs and anything else written at runtime.
+storage/
+uploads/
+*.log
+logs/
+
+# ---------- python ----------
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+.cache/
+.tox/
+.nox/
+
+# coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# type / env pins
+.python-version
+
+# ---------- notebooks ----------
+.ipynb_checkpoints/
+
+# ---------- local databases ----------
+*.sqlite3
+*.db
+
+# ---------- editors / os ----------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.sw?
+
+# ---------- misc ----------
+tmp/
+scratch/
