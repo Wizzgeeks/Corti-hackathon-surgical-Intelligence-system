@@ -1,12 +1,20 @@
 export const NAV = [
   {
-    to: '/today',
-    label: 'My today',
+    to: '/morning',
+    label: 'My morning',
     icon: (
       <>
-        <path d="M4 5h16v15H4z" />
-        <path d="M4 10h16" />
-        <path d="M9 14h6" />
+        <circle cx="12" cy="13" r="3.5" />
+        <path d="M12 5.5V7M5.6 8.1l1.1 1.1M18.4 8.1l-1.1 1.1M3 17h18" />
+      </>
+    ),
+  },
+  {
+    to: '/evening',
+    label: 'My evening',
+    icon: (
+      <>
+        <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
       </>
     ),
   },

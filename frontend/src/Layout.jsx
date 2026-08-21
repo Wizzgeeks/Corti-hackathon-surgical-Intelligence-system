@@ -4,7 +4,8 @@ import Icon from './Icon.jsx'
 import { NAV } from './nav.jsx'
 
 const TITLES = {
-  '/today': 'My today',
+  '/morning': 'My morning',
+  '/evening': 'My evening',
   '/appointments': 'Appointments',
   '/cases': 'Cases',
   '/team': 'Team',
@@ -23,7 +24,7 @@ function Layout() {
     <div className="shell">
       <FullScreenLoader />
       <nav className="sidenav" aria-label="Main">
-        <Link to="/today" className="brand">
+        <Link to="/morning" className="brand">
           <span className="brand-mark">OB</span>
           <span>
             <span className="brand-name">OpBook360</span>
@@ -45,11 +46,11 @@ function Layout() {
         </ul>
 
         <div className="nav-foot">
-          <span className="avatar">VR</span>
+          <span className="avatar">R</span>
           <span>
-            <span className="nav-foot-name">Vigneshwaran</span>
+            <span className="nav-foot-name">Dr. Ram Chandru</span>
             <br />
-            <span className="nav-foot-sub">Clinic lead</span>
+            <span className="nav-foot-sub">Surgeon</span>
           </span>
         </div>
       </nav>

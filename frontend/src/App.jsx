@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './Layout.jsx'
-import MyToday from './pages/MyToday.jsx'
+import MyMorning from './pages/MyMorning.jsx'
+import MyEvening from './pages/MyEvening.jsx'
 import Appointments from './pages/Appointments.jsx'
 import Cases from './pages/Cases.jsx'
 import CaseDetail from './pages/CaseDetail.jsx'
@@ -21,8 +22,11 @@ function App() {
         />
 
         <Route element={<Layout />}>
-          <Route index element={<Navigate to="/today" replace />} />
-          <Route path="today" element={<MyToday />} />
+          <Route index element={<Navigate to="/morning" replace />} />
+          <Route path="morning" element={<MyMorning />} />
+          {/* The page was called "today" before it was split in two. */}
+          <Route path="today" element={<Navigate to="/morning" replace />} />
+          <Route path="evening" element={<MyEvening />} />
           <Route path="appointments" element={<Appointments />} />
           <Route path="cases" element={<Cases />} />
           {/* Declared before ":id" so "new" is not read as a case id. */}
@@ -31,7 +35,7 @@ function App() {
           <Route path="team" element={<Team />} />
           <Route path="contacts" element={<Contacts />} />
           <Route path="referrals/new" element={<NewReferral />} />
-          <Route path="*" element={<Navigate to="/today" replace />} />
+          <Route path="*" element={<Navigate to="/morning" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

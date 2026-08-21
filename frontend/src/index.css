@@ -1017,28 +1017,6 @@ h3 {
   gap: 8px;
 }
 
-.pill {
-  padding: 3px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.pill-gold {
-  background: var(--gold-soft);
-  color: var(--gold);
-}
-
-.pill-good {
-  background: var(--good-soft);
-  color: var(--good);
-}
-
-.pill-info {
-  background: var(--info-soft);
-  color: var(--info);
-}
-
 /* Row 1: patient details | case details
    Row 2: referrer details | flags
    Right column: summary + recommendation, full height. */
@@ -1344,6 +1322,389 @@ textarea.input {
 .saved-note {
   font-size: 13px;
   color: var(--good);
+}
+
+/* ---------- morning KPIs ---------- */
+
+.kpis {
+  display: grid;
+  gap: var(--sp-6);
+}
+
+/* --- one figure --- */
+
+.kpi {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-4) var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+
+.kpi:hover {
+  border-color: var(--accent-bright);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+.kpi-value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The unit rides with the number without competing with it. */
+.kpi-unit {
+  font-size: 0.42em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink-3);
+}
+
+.kpi-label {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* --- the headline and its split --- */
+
+.kpi-hero {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 2.1fr);
+  gap: var(--sp-4);
+  align-items: stretch;
+}
+
+.kpi-mix {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--sp-4);
+}
+
+/* The count of patients is the one number the morning starts from. */
+.kpi-xl {
+  place-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-5);
+  border-color: transparent;
+  background: var(--ink-deep);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.kpi-xl .kpi-value {
+  justify-content: center;
+  font-size: 104px;
+  color: var(--on-deep);
+}
+
+.kpi-xl .kpi-label {
+  font-size: 15px;
+  color: var(--on-deep-2);
+}
+
+.kpi-xl:hover {
+  border-color: transparent;
+  transform: none;
+}
+
+.kpi-lg .kpi-value {
+  font-size: 60px;
+  color: var(--accent-ink);
+}
+
+.kpi-lg .kpi-label {
+  font-size: 14px;
+}
+
+/* --- everything else --- */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-4);
+}
+
+/* A figure that wants a decision. */
+.kpi-alert {
+  border-color: var(--accent-edge);
+  background: var(--tint-accent);
+}
+
+.kpi-alert .kpi-value {
+  color: var(--accent-ink);
+}
+
+/* A figure that is drifting rather than wrong. */
+.kpi-warn {
+  border-color: #b8852c33;
+  background: var(--gold-soft);
+}
+
+.kpi-warn .kpi-value {
+  color: var(--gold);
+}
+
+.kpi-warn .kpi-unit {
+  color: var(--gold);
+  opacity: 0.7;
+}
+
+@media (max-width: 900px) {
+  .kpi-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi-xl .kpi-value {
+    font-size: 76px;
+  }
+}
+
+@media (max-width: 560px) {
+  .kpi-value {
+    font-size: 34px;
+  }
+
+  .kpi-lg .kpi-value {
+    font-size: 44px;
+  }
+
+  .kpi-xl .kpi-value {
+    font-size: 64px;
+  }
+}
+
+/* ---------- day pages (my today / my evening) ---------- */
+
+.day {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+.day-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.day-eyebrow {
+  margin: 0 0 var(--sp-1);
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.day-title {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+
+.day-sub {
+  margin: var(--sp-1) 0 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.day-picker {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 220px;
+}
+
+.day-empty {
+  margin: 0;
+  padding: var(--sp-6) var(--sp-5);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius);
+  color: var(--ink-3);
+  text-align: center;
+}
+
+/* --- stat tiles --- */
+
+.tile-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-3);
+}
+
+.tile {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease);
+}
+
+.tile:hover {
+  border-color: var(--accent-bright);
+  box-shadow: var(--shadow);
+}
+
+.tile-value {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ink-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.tile-label {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.tile-hint {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* A count that should not be scanned past. */
+.tile-alert {
+  border-color: var(--accent-edge);
+  background: var(--tint-accent);
+}
+
+.tile-alert .tile-value {
+  color: var(--accent-ink);
+}
+
+/* The secondary breakdown sits quieter than the headline row. */
+.tile-row-soft .tile {
+  box-shadow: none;
+  background: var(--surface-sunken);
+}
+
+.tile-row-soft .tile-value {
+  font-size: 22px;
+}
+
+/* --- panels + the day in prose --- */
+
+.day-panel {
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.day-brief {
+  padding: var(--sp-4) var(--sp-5);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.day-brief-text {
+  margin: var(--sp-2) 0 0;
+  color: var(--ink-2);
+  line-height: 1.7;
+}
+
+/* --- the schedule as a timeline --- */
+
+.slots {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.slot {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+
+.slot:hover:not(:disabled) {
+  background: var(--tint-hover);
+  border-color: var(--accent-bright);
+}
+
+.slot:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* A booking with no case behind it cannot be opened. */
+.slot:disabled {
+  cursor: default;
+  opacity: 1;
+  background: var(--surface-sunken);
+}
+
+.slot-time {
+  flex: none;
+  width: 52px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.slot-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.slot-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.slot-meta {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 560px) {
+  .day-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .day-picker {
+    min-width: 0;
+  }
+
+  .slot {
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+  }
 }
 
 /* ---------- agent thinking ---------- */
@@ -2500,89 +2861,6 @@ button.block {
 }
 
 /* --- my today ------------------------------------------------------------ */
-
-/* Wraps on a narrow window so the button never sits on top of the picker. */
-.today-head-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.today-picker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.today-picker .field-label {
-  margin: 0;
-  white-space: nowrap;
-}
-
-.today-picker .input {
-  width: auto;
-  min-width: 200px;
-}
-
-.stat-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.stat {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--paper-2);
-}
-
-.stat-value {
-  display: block;
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.stat-label {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--ink-3);
-}
-
-/* A day with flagged cases in it should not read the same as a quiet one. */
-.stat-alert {
-  border-color: #f0c3bf;
-  background: #fdeceb;
-}
-
-.stat-alert .stat-value {
-  color: #b3483f;
-}
-
-.today-sub {
-  margin-top: 22px;
-}
-
-.today-empty {
-  margin-top: 16px;
-  color: var(--ink-3);
-}
-
-.briefing-actions {
-  display: flex;
-  gap: 8px;
-}
-
-/* The day can run long; the card scrolls rather than the page behind it. */
-.briefing-text {
-  max-height: 60vh;
-  overflow-y: auto;
-  line-height: 1.7;
-}
 
 /* --- consultation letter -------------------------------------------------- */
 
