@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDictation } from '../lib/useDictation.js'
 import { extractConsultationFacts } from '../lib/api.js'
 
@@ -64,6 +64,10 @@ function RecordConsultationDialog({
   initialTranscript = '',
   // Titles the dialog for whichever of those two jobs it is doing.
   resuming = false,
+  // Who is actually in the room. Sent to Corti with the participants so the
+  // stored interaction names them rather than saying "doctor" and "patient".
+  doctorName = '',
+  patientName = '',
 }) {
   const [turns, setTurns] = useState(() => parseTurns(initialTranscript, false))
   const [interim, setInterim] = useState(null)
@@ -125,8 +129,16 @@ function RecordConsultationDialog({
     })
   }, [])
 
+  /* Memoised: useDictation keeps this in a ref, and a fresh object each
+     render would churn it for no reason. */
+  const participants = useMemo(
+    () => ({ doctor: doctorName, patient: patientName }),
+    [doctorName, patientName],
+  )
+
   const { status, error, seconds, start, pause, resume, stop } = useDictation({
     caseId,
+    participants,
     // Not dictation: this opens an interaction stream so Corti separates the
     // two voices in the room.
     conversation: true,

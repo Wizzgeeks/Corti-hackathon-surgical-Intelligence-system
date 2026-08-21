@@ -35,23 +35,32 @@ const dictationConfig = (language) => ({
  *  flag turned on. Only this one takes `participants`, and only with them
  *  does Corti diarize, which is what makes a consultation two voices instead
  *  of one. Both participants sit on channel 0: one microphone in the room.
+ *
+ *  `role` stays the enum Corti diarizes on; the people in the room are named
+ *  alongside it, so the interaction Corti stores says who was actually
+ *  speaking rather than "doctor" and "patient".
  */
-const conversationConfig = (language) => ({
-  type: 'config',
-  configuration: {
-    transcription: {
-      primaryLanguage: language,
-      isDiarization: true,
-      isMultichannel: false,
-      participants: [
-        { channel: 0, role: 'doctor' },
-        { channel: 0, role: 'patient' },
-      ],
+const conversationConfig = (language, participants = {}) => {
+  const named = (role, name) =>
+    name?.trim() ? { channel: 0, role, name: name.trim() } : { channel: 0, role }
+
+  return {
+    type: 'config',
+    configuration: {
+      transcription: {
+        primaryLanguage: language,
+        isDiarization: true,
+        isMultichannel: false,
+        participants: [
+          named('doctor', participants.doctor),
+          named('patient', participants.patient),
+        ],
+      },
+      mode: { type: 'transcription' },
+      audioFormat: `audio/pcm; rate=${SAMPLE_RATE}; channels=1; bits=16`,
     },
-    mode: { type: 'transcription' },
-    audioFormat: `audio/pcm; rate=${SAMPLE_RATE}; channels=1; bits=16`,
-  },
-})
+  }
+}
 
 /**
  * Live dictation straight to Corti's transcribe socket.
@@ -73,6 +82,10 @@ export function useDictation({
   conversation = false,
   // Only used for a conversation: tags Corti's interaction with the case.
   caseId,
+  /* Who is in the room, as `{ doctor, patient }` names. Sent with the
+     participants so the stored interaction names them; either may be blank,
+     in which case that participant goes up with its role alone. */
+  participants,
   onText,
   onLevels,
   onSegment,
@@ -94,6 +107,9 @@ export function useDictation({
   const onTextRef = useRef(onText)
   const onLevelsRef = useRef(onLevels)
   const onSegmentRef = useRef(onSegment)
+  // A fresh object every render, so it is read through a ref rather than
+  // becoming a dependency that restarts the socket.
+  const participantsRef = useRef(participants)
 
   // Kept in sync from an effect: writing a ref during render is not allowed,
   // and the audio callback must always see the current handlers.
@@ -101,7 +117,8 @@ export function useDictation({
     onTextRef.current = onText
     onLevelsRef.current = onLevels
     onSegmentRef.current = onSegment
-  }, [onText, onLevels, onSegment])
+    participantsRef.current = participants
+  }, [onText, onLevels, onSegment, participants])
 
   const teardown = useCallback(() => {
     cancelAnimationFrame(frameRef.current)
@@ -150,7 +167,7 @@ export function useDictation({
         socket.send(
           JSON.stringify(
             conversation
-              ? conversationConfig(language)
+              ? conversationConfig(language, participantsRef.current)
               : dictationConfig(language),
           ),
         )

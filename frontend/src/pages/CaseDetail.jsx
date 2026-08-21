@@ -849,6 +849,8 @@ function CaseDetail({ isNew = false }) {
               caseId={record.case_id}
               initialTranscript={openTranscript.transcription}
               resuming
+              doctorName={openTranscript.consultant_name}
+              patientName={record.patient_name}
               onClose={() => setOpenTranscript(null)}
             />
           )}
@@ -856,6 +858,10 @@ function CaseDetail({ isNew = false }) {
           {recording && (
             <RecordConsultationDialog
               caseId={record.case_id}
+              /* The consultation on screen is the one being recorded, so its
+                 consultant is who is in the room. */
+              doctorName={active?.consultant_name ?? ''}
+              patientName={record.patient_name}
               onClose={() => {
                 // No refetch here: extracting the facts already re-runs the
                 // urgency agent, and that run reloads the case itself. The
