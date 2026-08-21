@@ -1,5 +1,3 @@
-# OpBook360
-
 A clinic workspace for orthopaedic referrals: a referral letter goes in as a
 PDF, and what comes out is a case a consultant can work from — graded for
 urgency, flagged, summarised, coded, with a personalised patient
