@@ -156,7 +156,11 @@ async def get_full_patient_record(
         "consultations with their transcripts and summaries, questions put to "
         "consultants and their replies, and any surgery. Use this when you "
         "know which case you are working on; `get_full_patient_record` is the "
-        "one to call when you need every case a patient has."
+        "one to call when you need every case a patient has. This returns the "
+        "evidence on the case, not the conclusions drawn from it: the case "
+        "summary, flags, recommendation and urgency are written by agents "
+        "running alongside you and are deliberately left out, so reach your "
+        "own conclusion from the material here."
     ),
 )
 async def get_full_case_record(case_id: str) -> dict[str, Any]:

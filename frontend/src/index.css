@@ -38,6 +38,36 @@
 
   --nav-w: 248px;
 
+  /* ---- spacing scale ----
+     Every gap/padding in this file should resolve to one of these. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* ---- surface tints ----
+     Section separation by background tone rather than hard rules.
+     All derived from the existing paper / ink-deep pair. */
+  --surface: var(--paper);
+  --surface-sunken: #00384008;
+  --tint-hover: #0038400a;
+  --tint-active: #00384014;
+  --tint-accent: #00a9bf0f;
+  --hairline: #00384012;
+
+  /* ---- interaction states ---- */
+  --focus-ring: 0 0 0 3px var(--accent-edge);
+  --disabled-opacity: 0.55;
+
+  /* ---- motion ---- */
+  --dur-1: 0.12s;
+  --dur-2: 0.18s;
+  --dur-3: 0.28s;
+
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color: var(--ink);
   background: var(--paper-2);
@@ -51,6 +81,34 @@
 
 body {
   margin: 0;
+}
+
+/* One focus treatment for everything reachable by keyboard. Individual
+   components may position it, but none should remove it. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* Disabled controls read as inert everywhere, without per-component rules. */
+:where(button, input, select, textarea):disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* Motion is decoration here — drop it wholesale when asked to.
+   The spinner is exempt: it is the only animation carrying meaning, and it
+   has its own gentler pulse further down. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.spinner),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 h1,
@@ -959,28 +1017,6 @@ h3 {
   gap: 8px;
 }
 
-.pill {
-  padding: 3px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.pill-gold {
-  background: var(--gold-soft);
-  color: var(--gold);
-}
-
-.pill-good {
-  background: var(--good-soft);
-  color: var(--good);
-}
-
-.pill-info {
-  background: var(--info-soft);
-  color: var(--info);
-}
-
 /* Row 1: patient details | case details
    Row 2: referrer details | flags
    Right column: summary + recommendation, full height. */
@@ -1205,6 +1241,58 @@ textarea.input {
   color: var(--ink-3);
 }
 
+/* Label block and its edit affordance sit on one line. */
+.field-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.field-head .field-hint {
+  margin-bottom: var(--sp-2);
+}
+
+/* The header's controls stay on one line beside the label rather than
+   wrapping under it as they are added to. */
+.field-head .row-actions {
+  flex: none;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .field-head {
+    flex-direction: column;
+  }
+
+  .field-head .row-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Saved prose, read rather than edited. Sits on a faint sunken tint so it
+   reads as settled content instead of an empty input. */
+.field-text {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.field-empty {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  font-size: 14px;
+}
+
 .textarea {
   width: 100%;
   padding: 12px 14px;
@@ -1234,6 +1322,660 @@ textarea.input {
 .saved-note {
   font-size: 13px;
   color: var(--good);
+}
+
+/* ---------- morning KPIs ---------- */
+
+.kpis {
+  display: grid;
+  gap: var(--sp-6);
+}
+
+/* --- one figure --- */
+
+.kpi {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-4) var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+
+.kpi:hover {
+  border-color: var(--accent-bright);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+.kpi-value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The unit rides with the number without competing with it. */
+.kpi-unit {
+  font-size: 0.42em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink-3);
+}
+
+.kpi-label {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* --- the headline and its split --- */
+
+.kpi-hero {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 2.1fr);
+  gap: var(--sp-4);
+  align-items: stretch;
+}
+
+.kpi-mix {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--sp-4);
+}
+
+/* The count of patients is the one number the morning starts from. */
+.kpi-xl {
+  place-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-5);
+  border-color: transparent;
+  background: var(--ink-deep);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.kpi-xl .kpi-value {
+  justify-content: center;
+  font-size: 104px;
+  color: var(--on-deep);
+}
+
+.kpi-xl .kpi-label {
+  font-size: 15px;
+  color: var(--on-deep-2);
+}
+
+.kpi-xl:hover {
+  border-color: transparent;
+  transform: none;
+}
+
+.kpi-lg .kpi-value {
+  font-size: 60px;
+  color: var(--accent-ink);
+}
+
+.kpi-lg .kpi-label {
+  font-size: 14px;
+}
+
+/* --- everything else --- */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-4);
+}
+
+/* A figure that wants a decision. */
+.kpi-alert {
+  border-color: var(--accent-edge);
+  background: var(--tint-accent);
+}
+
+.kpi-alert .kpi-value {
+  color: var(--accent-ink);
+}
+
+/* A figure that is drifting rather than wrong. */
+.kpi-warn {
+  border-color: #b8852c33;
+  background: var(--gold-soft);
+}
+
+.kpi-warn .kpi-value {
+  color: var(--gold);
+}
+
+.kpi-warn .kpi-unit {
+  color: var(--gold);
+  opacity: 0.7;
+}
+
+@media (max-width: 900px) {
+  .kpi-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi-xl .kpi-value {
+    font-size: 76px;
+  }
+}
+
+@media (max-width: 560px) {
+  .kpi-value {
+    font-size: 34px;
+  }
+
+  .kpi-lg .kpi-value {
+    font-size: 44px;
+  }
+
+  .kpi-xl .kpi-value {
+    font-size: 64px;
+  }
+}
+
+/* ---------- day pages (my today / my evening) ---------- */
+
+.day {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+.day-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.day-eyebrow {
+  margin: 0 0 var(--sp-1);
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.day-title {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+
+.day-sub {
+  margin: var(--sp-1) 0 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.day-picker {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 220px;
+}
+
+.day-empty {
+  margin: 0;
+  padding: var(--sp-6) var(--sp-5);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius);
+  color: var(--ink-3);
+  text-align: center;
+}
+
+/* --- stat tiles --- */
+
+.tile-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-3);
+}
+
+.tile {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease);
+}
+
+.tile:hover {
+  border-color: var(--accent-bright);
+  box-shadow: var(--shadow);
+}
+
+.tile-value {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ink-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.tile-label {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.tile-hint {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* A count that should not be scanned past. */
+.tile-alert {
+  border-color: var(--accent-edge);
+  background: var(--tint-accent);
+}
+
+.tile-alert .tile-value {
+  color: var(--accent-ink);
+}
+
+/* The secondary breakdown sits quieter than the headline row. */
+.tile-row-soft .tile {
+  box-shadow: none;
+  background: var(--surface-sunken);
+}
+
+.tile-row-soft .tile-value {
+  font-size: 22px;
+}
+
+/* --- panels + the day in prose --- */
+
+.day-panel {
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.day-brief {
+  padding: var(--sp-4) var(--sp-5);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+.day-brief-text {
+  margin: var(--sp-2) 0 0;
+  color: var(--ink-2);
+  line-height: 1.7;
+}
+
+/* --- the schedule as a timeline --- */
+
+.slots {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.slot {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+
+.slot:hover:not(:disabled) {
+  background: var(--tint-hover);
+  border-color: var(--accent-bright);
+}
+
+.slot:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* A booking with no case behind it cannot be opened. */
+.slot:disabled {
+  cursor: default;
+  opacity: 1;
+  background: var(--surface-sunken);
+}
+
+.slot-time {
+  flex: none;
+  width: 52px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.slot-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.slot-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.slot-meta {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 560px) {
+  .day-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .day-picker {
+    min-width: 0;
+  }
+
+  .slot {
+    gap: var(--sp-3);
+    padding: var(--sp-3);
+  }
+}
+
+/* ---------- agent thinking ---------- */
+
+.agent-think {
+  padding: var(--sp-1) 0;
+}
+
+.agent-think-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+}
+
+.agent-think-text {
+  font-size: 13px;
+  color: var(--accent-ink);
+  /* Each message replaces the last in place; the fade keeps the swap from
+     reading as a flicker. */
+  animation: agent-fade var(--dur-3) var(--ease);
+}
+
+/* Three dots working, rather than a spinner — four spinners on one screen
+   reads as four things stuck. */
+.agent-dots {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+}
+
+.agent-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: agent-bounce 1.2s var(--ease) infinite;
+}
+
+.agent-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.agent-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.agent-skeleton {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.agent-skeleton-line {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--line);
+  animation: agent-pulse 1.6s var(--ease) infinite;
+}
+
+/* Ragged ends, so it reads as prose rather than a loading bar. */
+.agent-skeleton-line:last-child {
+  width: 62%;
+}
+
+.agent-skeleton-line:nth-child(2) {
+  width: 88%;
+}
+
+@keyframes agent-fade {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@keyframes agent-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+@keyframes agent-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ---------- patient questionnaire ---------- */
+
+/* Stands where the copy-link button will be, so the header row keeps its
+   shape rather than jumping when the form is ready. */
+.quest-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.quest-wait-text {
+  font-size: 13px;
+  color: var(--ink-3);
+  /* Each stage replaces the last in place; the fade keeps the swap from
+     reading as a flicker. */
+  animation: quest-fade var(--dur-3) var(--ease);
+}
+
+/* Doubled class so this wins regardless of source order — the base
+   `.spinner` rule is defined further down the file. */
+.spinner.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+@keyframes quest-fade {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+/* ---------- medical coding ---------- */
+
+/* Sits under the case head, on a faint accent tint so it reads as derived
+   detail rather than another editable section of the case. */
+.coding {
+  margin-top: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--accent-edge);
+  border-radius: var(--radius);
+  background: var(--tint-accent);
+}
+
+.coding-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+
+.coding-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coding-chip {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease);
+}
+
+.coding-chip:hover {
+  border-color: var(--accent-bright);
+  box-shadow: var(--shadow);
+}
+
+.coding-code {
+  flex: none;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.coding-desc {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+/* The phrase the code was read from — supporting evidence, so it sits
+   quieter and on its own line. */
+.coding-evidence {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.coding-confidence {
+  flex: none;
+  padding: 1px var(--sp-2);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coding-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* Placeholder chips while Corti is coding: the panel holds its height so
+   the case below does not jump when the real codes arrive. */
+.coding-chip-skeleton {
+  border-color: var(--hairline);
+  background: var(--surface-sunken);
+  box-shadow: none;
+  animation: coding-pulse 1.4s var(--ease) infinite;
+}
+
+.coding-chip-skeleton .coding-code {
+  width: 54px;
+}
+
+.coding-chip-skeleton .coding-desc {
+  width: 140px;
+}
+
+.coding-chip-skeleton .coding-code,
+.coding-chip-skeleton .coding-desc {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.coding-chip-skeleton:nth-child(2) .coding-desc {
+  width: 200px;
+}
+
+.coding-chip-skeleton:nth-child(3) .coding-desc {
+  width: 110px;
+}
+
+@keyframes coding-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (max-width: 560px) {
+  .coding {
+    padding: var(--sp-3) var(--sp-4);
+  }
+
+  .coding-head {
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .coding-chip {
+    width: 100%;
+  }
 }
 
 /* ---------- upload form ---------- */
@@ -2120,127 +2862,99 @@ button.block {
 
 /* --- my today ------------------------------------------------------------ */
 
-.today-picker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* --- consultation letter -------------------------------------------------- */
+
+.letter-modal {
+  width: min(820px, 100%);
 }
 
-.today-picker .field-label {
-  margin: 0;
-  white-space: nowrap;
-}
-
-.today-picker .input {
-  width: auto;
-  min-width: 200px;
-}
-
-.stat-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.stat {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--paper-2);
-}
-
-.stat-value {
-  display: block;
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.stat-label {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--ink-3);
-}
-
-/* A day with flagged cases in it should not read the same as a quiet one. */
-.stat-alert {
-  border-color: #f0c3bf;
-  background: #fdeceb;
-}
-
-.stat-alert .stat-value {
-  color: #b3483f;
-}
-
-.today-sub {
-  margin-top: 22px;
-}
-
-.today-empty {
-  margin-top: 16px;
-  color: var(--ink-3);
-}
-
-.briefing {
-  margin-top: 22px;
-  padding: 16px;
-  border: 1px solid var(--accent-edge);
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-}
-
-.briefing > .panel-head {
-  margin: 0 0 8px;
-  padding: 0;
-  border: 0;
-}
-
-.briefing .summary-text {
-  line-height: 1.6;
-}
-
-.briefing-controls {
+.letter-actions {
   display: flex;
   gap: 8px;
 }
 
-/* --- briefing player ----------------------------------------------------- */
-
-.briefing-player {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* Tall enough to read a page of the letter without scrolling for every edit. */
+.letter-textarea {
+  min-height: 55vh;
+  font-family: var(--font-body, inherit);
+  font-size: 14px;
+  line-height: 1.65;
+  resize: vertical;
+  white-space: pre-wrap;
 }
 
-/* Driven by the audio itself, so it only moves when there is a voice. */
-.eq-briefing {
-  height: 38px;
-  gap: 3px;
-  padding: 0 6px;
-  border: 1px solid var(--accent-edge);
-  border-radius: var(--radius-sm);
-  background: var(--paper);
+/* The printable letter: composed on screen, shown only to the printer. */
+.letter-sheet {
+  display: none;
 }
 
-.briefing-text {
-  line-height: 1.7;
+.letter-body {
+  /* The agent writes in paragraphs and blank lines; they are the layout. */
+  white-space: pre-wrap;
 }
 
-/* Each sentence is its own target: tapping one plays from there. */
-.briefing-sentence {
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.2s var(--ease), color 0.2s var(--ease);
-}
+@media print {
+  /* Everything but the letter is chrome — the page, the dialog, the backdrop
+     — so the sheet is lifted out of it rather than each part being hidden. */
+  body * {
+    visibility: hidden;
+  }
 
-.briefing-sentence:hover {
-  background: var(--paper-2);
-}
+  .letter-sheet,
+  .letter-sheet * {
+    visibility: visible;
+  }
 
-.briefing-sentence.is-active {
-  background: var(--accent);
-  color: var(--paper);
-  box-shadow: 0 0 0 3px var(--accent);
+  .modal-backdrop {
+    position: static;
+    display: block;
+    padding: 0;
+    overflow: visible;
+    background: none;
+  }
+
+  .modal {
+    width: auto;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .letter-sheet {
+    display: block;
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0;
+    color: #000;
+    font-size: 12pt;
+    line-height: 1.6;
+  }
+
+  .letter-head {
+    margin-bottom: 24pt;
+    padding-bottom: 8pt;
+    border-bottom: 1px solid #000;
+  }
+
+  .letter-consultant {
+    margin: 0;
+    font-size: 14pt;
+    font-weight: 600;
+  }
+
+  .letter-role,
+  .letter-date {
+    margin: 2pt 0 0;
+    font-size: 11pt;
+  }
+
+  .letter-date {
+    margin-top: 8pt;
+  }
+
+  @page {
+    margin: 20mm;
+  }
 }

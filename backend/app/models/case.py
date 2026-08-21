@@ -14,6 +14,38 @@ class Flag(BaseModel):
     severity: FlagSeverity = FlagSeverity.LOW
     rationale: str | None = None
 
+class MedicalCode(BaseModel):
+    """One coded diagnosis, as Corti's coding tool returned it.
+
+    Stored on the case rather than recomputed per view: coding costs a Corti
+    call, and the text it is derived from only changes when an agent run
+    rewrites it. `update_agent_run` clears these, which is what makes the
+    next read fetch fresh ones.
+    """
+
+    code: str = ""
+    description: str = ""
+    system: str = ""
+    # Corti does not always score a code.
+    confidence: float | None = None
+    evidence: str = ""
+
+
+class QuestionnaireQuestion(BaseModel):
+    """One question actually put to this patient.
+
+    The full form is nine questions, but a patient is only asked what the
+    clinical background does not already answer — so which questions apply
+    is a property of the case, and stored with it.
+    """
+
+    order: int
+    question: str
+    # Why this one survived the cull, for a clinician wondering why the
+    # patient was asked about allergies and not about medication.
+    reason: str = ""
+
+
 class Referred_by(BaseModel):
     name: str
     role: str
@@ -33,8 +65,18 @@ class Case(MongoModel):
     # live on Consultation.
     pre_consultation_details: str | None = None
     notes: str | None = None
+    # Written by the coding tool from the consultation summaries; empty until
+    # the case has been consulted on, and cleared by every agent run.
+    medical_codes: list[MedicalCode] = Field(default_factory=list)
     is_urgent: bool = False
     urgency_reason: str | None = None
+    # The personalised form: which of the standard questions this patient is
+    # asked. Empty until it has been worked out, and the public form falls
+    # back to asking everything while it is.
+    questionnaire_questions: list[QuestionnaireQuestion] = Field(
+        default_factory=list
+    )
+    questionnaire_generated_at: datetime | None = None
     # Set when the patient submits the public questionnaire, and again once a
     # clinician has folded those answers into the case.
     patient_recording_completed: bool = False

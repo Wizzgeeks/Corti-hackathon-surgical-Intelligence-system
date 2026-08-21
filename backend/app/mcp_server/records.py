@@ -190,11 +190,18 @@ async def full_case_record(case_id: str) -> dict[str, Any]:
     """Everything on file for one case, shaped for a model to read.
 
         {"case": {case_id, pdf_content, referred_by, appointments,
-                  investigations, requests, consultation, patient, surgery}}
+                  investigations, consultation, patient, surgery}}
 
     The case is read first because everything else keys off it; the five
     collections that hang off it are then read concurrently, so the whole
     record costs about one round trip rather than five.
+
+    What the agents write is *not* returned: the case summary, the flags, the
+    recommendation and the urgency. Those agents run in parallel, so a record
+    read mid-run would carry the previous run's answers, and an agent that
+    read them back would build on a conclusion that is about to be replaced.
+    The evidence they are drawn from — the referral, the consultations, the
+    investigations, the symptoms — is all still here.
     """
     if not ObjectId.is_valid(case_id):
         raise ValueError(f"{case_id!r} is not a valid case id.")
@@ -269,12 +276,14 @@ async def full_case_record(case_id: str) -> dict[str, Any]:
         "surgery": surgeries[0] if surgeries else {},
         "surgeries": surgeries,
         # The clinical picture itself, which the shape above does not name.
-        "case_summary": case.get("case_summary") or "",
+        # Deliberately without the case summary, flags, recommendation and
+        # urgency: those are what the agents themselves write, and they run
+        # in parallel. An agent reading them back would be shown whatever the
+        # last run left behind — which, mid-run, is the previous answer rather
+        # than the current one. Everything here is the material those
+        # conclusions are drawn from, so each agent works from the evidence
+        # rather than from another agent's stale verdict.
         "symptoms": case.get("symptoms") or [],
-        "flags": case.get("flags") or [],
-        "recommendation": case.get("recommendation") or "",
-        "is_urgent": case.get("is_urgent", False),
-        "urgency_reason": case.get("urgency_reason") or "",
         "status": case.get("status") or "",
         "pre_consultation_details": case.get("pre_consultation_details") or "",
         "notes": case.get("notes") or "",
@@ -284,12 +293,11 @@ async def full_case_record(case_id: str) -> dict[str, Any]:
 
     logger.info(
         "Case %s: %d appointment(s), %d consultation(s), %d investigation(s), "
-        "%d request(s), %d surgery(ies).",
+        "%d surgery(ies).",
         case_id,
         len(appointments),
         len(consultations),
         len(investigations),
-        len(record["requests"]),
         len(surgeries),
     )
 

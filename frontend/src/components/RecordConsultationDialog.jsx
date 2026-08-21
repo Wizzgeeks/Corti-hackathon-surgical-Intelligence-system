@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDictation } from '../lib/useDictation.js'
 import { extractConsultationFacts } from '../lib/api.js'
 
@@ -54,8 +54,22 @@ const parseTurns = (text, swapped) => {
  * one turn, and the interim segment is shown as it is revised. Nothing is
  * recorded — the audio is dropped as it streams.
  */
-function RecordConsultationDialog({ caseId, onClose }) {
-  const [turns, setTurns] = useState([])
+function RecordConsultationDialog({
+  caseId,
+  onClose,
+  // A transcript already on the consultation. Seeding the turns with it is
+  // what turns this dialog into "read what was said, then carry on": the
+  // Resume control and the extraction below already work off the turns, so
+  // continuing an old recording needs nothing else.
+  initialTranscript = '',
+  // Titles the dialog for whichever of those two jobs it is doing.
+  resuming = false,
+  // Who is actually in the room. Sent to Corti with the participants so the
+  // stored interaction names them rather than saying "doctor" and "patient".
+  doctorName = '',
+  patientName = '',
+}) {
+  const [turns, setTurns] = useState(() => parseTurns(initialTranscript, false))
   const [interim, setInterim] = useState(null)
   // Diarization decides who is speaker 0; only the room knows if that is the
   // consultant, so the labels can be swapped.
@@ -71,7 +85,7 @@ function RecordConsultationDialog({ caseId, onClose }) {
 
   // Corti reuses one id for every transcript in a stream, so it cannot key
   // the turns — they get their own counter.
-  const turnSeq = useRef(0)
+  const turnSeq = useRef(parseTurns(initialTranscript, false).length)
   const barsRef = useRef([])
   const scrollRef = useRef(null)
   // Autoscroll follows the transcript until the reader scrolls up, which
@@ -115,8 +129,16 @@ function RecordConsultationDialog({ caseId, onClose }) {
     })
   }, [])
 
+  /* Memoised: useDictation keeps this in a ref, and a fresh object each
+     render would churn it for no reason. */
+  const participants = useMemo(
+    () => ({ doctor: doctorName, patient: patientName }),
+    [doctorName, patientName],
+  )
+
   const { status, error, seconds, start, pause, resume, stop } = useDictation({
     caseId,
+    participants,
     // Not dictation: this opens an interaction stream so Corti separates the
     // two voices in the room.
     conversation: true,
@@ -229,13 +251,15 @@ function RecordConsultationDialog({ caseId, onClose }) {
 
         <div className="panel-head">
           <div>
-            <h2>Record consultation</h2>
+            <h2>{resuming ? 'Consultation recording' : 'Record consultation'}</h2>
             <p className="cell-sub">
               {status === 'connecting'
                 ? 'Connecting…'
                 : live
                   ? `Listening · ${mmss(seconds)}`
-                  : 'Speech is transcribed live. No audio is stored.'}
+                  : resuming
+                    ? 'The transcript as recorded. Resume to add to it.'
+                    : 'Speech is transcribed live. No audio is stored.'}
             </p>
           </div>
           <div className="row-actions">

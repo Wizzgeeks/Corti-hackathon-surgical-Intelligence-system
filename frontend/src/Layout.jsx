@@ -4,7 +4,8 @@ import Icon from './Icon.jsx'
 import { NAV } from './nav.jsx'
 
 const TITLES = {
-  '/today': 'My today',
+  '/morning': 'My morning',
+  '/evening': 'My evening',
   '/appointments': 'Appointments',
   '/cases': 'Cases',
   '/team': 'Team',
@@ -17,16 +18,16 @@ function Layout() {
   const isNewReferral = pathname === '/referrals/new'
   const isCaseDetail = pathname.startsWith('/cases/')
   const title =
-    TITLES[pathname] ?? (isCaseDetail ? 'Case detail' : 'Referral Triage')
+    TITLES[pathname] ?? (isCaseDetail ? 'Case detail' : 'OpBook360')
 
   return (
     <div className="shell">
       <FullScreenLoader />
       <nav className="sidenav" aria-label="Main">
-        <Link to="/today" className="brand">
-          <span className="brand-mark">RT</span>
+        <Link to="/morning" className="brand">
+          <span className="brand-mark">OB</span>
           <span>
-            <span className="brand-name">Referral Triage</span>
+            <span className="brand-name">OpBook360</span>
             <br />
             <span className="brand-sub">Clinic workspace</span>
           </span>
@@ -45,11 +46,11 @@ function Layout() {
         </ul>
 
         <div className="nav-foot">
-          <span className="avatar">VR</span>
+          <span className="avatar">R</span>
           <span>
-            <span className="nav-foot-name">Vigneshwaran</span>
+            <span className="nav-foot-name">Dr. Ram Chandru</span>
             <br />
-            <span className="nav-foot-sub">Triage lead</span>
+            <span className="nav-foot-sub">Surgeon</span>
           </span>
         </div>
       </nav>

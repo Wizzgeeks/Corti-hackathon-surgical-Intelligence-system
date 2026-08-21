@@ -135,8 +135,11 @@ function PatientQuestionnaire() {
           </>
         ) : (
           <>
+            {/* Position in this patient's form, not the question's number on
+                the standard nine — they are only asked a few of them, so the
+                stored order jumps and would read as "5 of 4". */}
             <p className="patient-eyebrow">
-              Question {current.order} of {questions.length}
+              Question {step} of {questions.length}
             </p>
             <h1 className="patient-question">{current.question}</h1>
 

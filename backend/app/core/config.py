@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     corti_case_summary_agent_id: str = "a8f527e0-ec46-4809-96d0-6afcf21ed199"
     corti_flag_agent_id: str = "7dcc2ffa-ff50-4aa7-88d7-bbe126d75f62"
     corti_next_action_agent_id: str = "e1f26bf9-dc7c-419f-a29b-52ec35d26d85"
+    corti_consultation_letter_agent_id: str = (
+        "c87093cd-975c-4de3-ac77-564eea80f96a"
+    )
     # Testing switch: answer from a canned response instead of calling
     # the agent.
     corti_urgency_agent_dummy: bool = False
@@ -50,16 +53,6 @@ class Settings(BaseSettings):
     # that project's credentials; blank falls back to the main pair.
     corti_agent_client_id: str = ""
     corti_agent_client_secret: str = ""
-
-    # --- ElevenLabs (text to speech) ---
-    elevenlabs_api_key: str = ""
-    # Flash is the low-latency model; the briefing is read on the way in, so
-    # waiting on a slower one would defeat the point.
-    elevenlabs_model_id: str = "eleven_flash_v2_5"
-    # A voice the account can actually use — the shared library is not
-    # available on every plan.
-    elevenlabs_voice_id: str = "JBFqnCBsd6RMkjVDRZzb"
-    elevenlabs_base_url: str = "https://api.elevenlabs.io/v1"
 
     # Template behind the case data extraction document.
     corti_case_extraction_template_id: str = "c7047d5d-eb7d-4a5b-99c0-70d7d66ed6c0"

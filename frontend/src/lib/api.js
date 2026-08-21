@@ -120,14 +120,14 @@ export async function uploadReferral(file) {
     // fetch only rejects on network/CORS failures — the request never
     // reached the server, so say so rather than reporting a status.
     throw new Error(
-      `Could not reach the triage API at ${BASE_URL}. Is the backend running?`,
+      `Could not reach the API at ${BASE_URL}. Is the backend running?`,
       { cause },
     )
   }
 
   if (!response.ok) {
     throw new Error(
-      `Triage failed (${response.status}). ${await errorMessage(response)}`.trim(),
+      `Could not read the referral (${response.status}). ${await errorMessage(response)}`.trim(),
     )
   }
 
@@ -262,6 +262,15 @@ export async function listCases({ limit = 20, skip = 0, isUrgent } = {}) {
 
 /** GET /cases/{id} — the full case, flattened into the shape the detail
  *  page edits, with consultations resolved against their appointments. */
+/** One coded diagnosis from Corti. */
+export const normaliseMedicalCode = (item) => ({
+  code: toText(item?.code),
+  description: toText(item?.description),
+  system: toText(item?.system),
+  confidence: typeof item?.confidence === 'number' ? item.confidence : null,
+  evidence: toText(item?.evidence),
+})
+
 export const normaliseCaseDetail = (data) => {
   const patient = data?.patient ?? {}
   const referrers = data?.referred_by
@@ -271,12 +280,45 @@ export const normaliseCaseDetail = (data) => {
     (data?.appointments ?? []).map((item) => [item.appointment_id, item]),
   )
 
-  const consultations = (data?.consultations ?? []).map((item, index) => {
+  /* Consultations arrive in the order they were written. Ordered here by
+     when they were booked, newest first, so the tab a clinician wants — the
+     appointment just had, or the one coming up — is the one already open.
+     One without an appointment has no date to sort on and keeps its place
+     at the end.
+
+     The numbering stays chronological: "Consultation 1" is the first the
+     patient attended whichever end of the list it is displayed at, so a
+     number in a note still means the same visit. */
+  const byStart = (item) => {
+    const start = appointments.get(item.appointment_id)?.start_time
+    const at = start ? new Date(start).getTime() : NaN
+    return Number.isNaN(at) ? null : at
+  }
+
+  const raw = data?.consultations ?? []
+  const dated = raw.filter((item) => byStart(item) !== null)
+  const undated = raw.filter((item) => byStart(item) === null)
+
+  // Numbered by when they happened, oldest first.
+  const numbers = new Map(
+    [...dated]
+      .sort((a, b) => byStart(a) - byStart(b))
+      .concat(undated)
+      .map((item, index) => [item, index + 1]),
+  )
+
+  // Displayed newest first, with the undated ones after the dated rather
+  // than ahead of them.
+  const ordered = [...dated]
+    .sort((a, b) => byStart(b) - byStart(a))
+    .concat(undated)
+
+  const consultations = ordered.map((item, index) => {
     const appointment = appointments.get(item.appointment_id)
     return {
       id: item.consultation_id ?? `c${index + 1}`,
       appointment_id: item.appointment_id ?? '',
-      label: `Consultation ${index + 1}`,
+      label: `Consultation ${numbers.get(item)}`,
       date: formatDate(appointment?.start_time),
       time: formatTime(appointment?.start_time),
       end_time: formatTime(appointment?.end_time),
@@ -324,6 +366,18 @@ export const normaliseCaseDetail = (data) => {
     is_urgent: Boolean(data?.is_urgent),
     urgency_reason: toText(data?.urgency_reason),
     referral_document_content: toText(data?.referral_document_content),
+    // Already-coded diagnoses, stored on the case. Present means the coding
+    // endpoint does not need asking again.
+    medical_codes: (data?.medical_codes ?? []).map(normaliseMedicalCode),
+    // Which questions this patient is asked. Empty means the form has not
+    // been personalised yet.
+    questionnaire_questions: (data?.questionnaire_questions ?? []).map(
+      (item) => ({
+        order: item?.order ?? 0,
+        question: toText(item?.question),
+        reason: toText(item?.reason),
+      }),
+    ),
     consultations,
     appointments: data?.appointments ?? [],
   }
@@ -359,12 +413,18 @@ const formatDateTime = (value) => {
   return time ? `${date} ${time}` : date
 }
 
-export async function getCaseDetail(caseId) {
-  return withLoading(async () =>
+/** `quiet` skips the full-screen loader, for the reload that follows an agent
+ *  run — the case page's own sections are already showing that work. */
+export async function getCaseDetail(caseId, { quiet = false } = {}) {
+  const fetchCase = async () =>
     normaliseCaseDetail(
-      await getJson(`${BASE_URL}${CASES_PATH}/${encodeURIComponent(caseId)}`, 'the case'),
-    ),
-  )
+      await request(
+        'GET',
+        `${BASE_URL}${CASES_PATH}/${encodeURIComponent(caseId)}`,
+        { what: 'Loading the case', quiet },
+      ),
+    )
+  return quiet ? fetchCase() : withLoading(fetchCase)
 }
 
 /** Flat UI field -> [group, API key] for PATCH /cases/{id}. */
@@ -455,21 +515,26 @@ const inFlight = new Map()
 
 /** One JSON request, with the unreachable-vs-HTTP-error split every caller
  *  needs and the loader held for its duration. */
-async function request(method, target, { body, what } = {}) {
+async function request(method, target, { body, what, quiet } = {}) {
   if (method === 'GET') {
     const pending = inFlight.get(target)
     if (pending) return pending
-    const promise = sendRequest(method, target, { body, what }).finally(() => {
-      inFlight.delete(target)
-    })
+    const promise = sendRequest(method, target, { body, what, quiet }).finally(
+      () => {
+        inFlight.delete(target)
+      },
+    )
     inFlight.set(target, promise)
     return promise
   }
-  return sendRequest(method, target, { body, what })
+  return sendRequest(method, target, { body, what, quiet })
 }
 
-async function sendRequest(method, target, { body, what } = {}) {
-  return withLoading(async () => {
+/** `quiet` runs the call without the full-screen loader, for work a single
+ *  section reports on itself. Everything else about the call is unchanged. */
+async function sendRequest(method, target, { body, what, quiet } = {}) {
+  const hold = quiet ? (task) => task() : withLoading
+  return hold(async () => {
     let response
     try {
       response = await fetch(target, {
@@ -771,8 +836,9 @@ const caseWatchers = new Set()
 
 /** Listen for a reassessed case. Returns the unsubscribe function.
  *
- *  The payload is `{caseId, detail, error}` — `detail` is the reloaded case
- *  when the run succeeded, `error` the reason when it did not. */
+ *  The payload is `{caseId, pending, detail, error}` — `pending` marks the
+ *  run starting, `detail` is the reloaded case when it succeeded, `error`
+ *  the reason when it did not. */
 export function onCaseReassessed(listener) {
   caseWatchers.add(listener)
   return () => caseWatchers.delete(listener)
@@ -789,10 +855,14 @@ function announce(payload) {
 }
 
 /** Re-grade a case's urgency with the Corti agent. */
+/** Quiet on purpose: the case page puts each agent-written section into its
+ *  own waiting state for this, and a full-screen overlay on top of that would
+ *  block the three sections that are still readable. */
 export async function updateAgentRun(caseId) {
   return request('POST', `${BASE_URL}/update_agent_run`, {
     body: { case_id: caseId },
     what: 'Reassessing urgency',
+    quiet: true,
   })
 }
 
@@ -806,9 +876,14 @@ export async function reassessCase(caseId) {
   const pending = reassessing.get(caseId)
   if (pending) return pending
 
+  // Announced before the call goes out, so a page showing this case can put
+  // its agent-written sections into a waiting state whichever route started
+  // the run — opening an ungraded case, or saving an edit.
+  announce({ caseId, pending: true })
+
   const run = (async () => {
     const agentRun = await updateAgentRun(caseId)
-    const detail = await getCaseDetail(caseId)
+    const detail = await getCaseDetail(caseId, { quiet: true })
     return { caseId, agentRun, detail }
   })()
     .then((result) => {
@@ -837,19 +912,102 @@ function reassessInBackground(caseId) {
   })
 }
 
+// --- medical coding --------------------------------------------------------
+
+/** Code a case from its consultation summaries.
+ *
+ *  Deliberately `quiet`: the coding panel shows its own progress, and a
+ *  blocking overlay over the whole page for a side panel would be wrong.
+ *  A case with no consultation yet answers with an empty list and a reason,
+ *  not an error. */
+export async function getMedicalCodes(caseId, { refresh = false } = {}) {
+  const data = await request('POST', `${BASE_URL}/get_medical_codes`, {
+    body: { case_id: caseId, refresh },
+    what: 'Reading the medical codes',
+    quiet: true,
+  })
+  return {
+    case_id: toText(data?.case_id),
+    codes: (data?.codes ?? []).map(normaliseMedicalCode),
+    system: data?.system ?? [],
+    source_characters: data?.source_characters ?? 0,
+    cached: Boolean(data?.cached),
+    errors: data?.errors ?? [],
+  }
+}
+
+// --- questionnaire personalisation -----------------------------------------
+
+/** Work out which of the standard questions this patient still needs asked.
+ *
+ *  `quiet`, like the coding call: the panel that asks for this reports its
+ *  own progress, and the rest of the case stays readable while it runs.
+ *
+ *  Never rejects on a Corti failure — the backend falls back to the whole
+ *  form and reports why in `errors`, because a patient asked too much is a
+ *  far smaller problem than a patient asked nothing.
+ */
+export async function personaliseQuestionnaire(caseId, { refresh = false } = {}) {
+  const data = await request(
+    'POST',
+    `${BASE_URL}/cases/${encodeURIComponent(caseId)}/questionnaire/personalise`,
+    {
+      body: { refresh },
+      what: 'Personalising the questionnaire',
+      quiet: true,
+    },
+  )
+  return {
+    case_id: toText(data?.case_id),
+    questions: (data?.questions ?? []).map((item) => ({
+      order: item?.order ?? 0,
+      question: toText(item?.question),
+      reason: toText(item?.reason),
+    })),
+    cached: Boolean(data?.cached),
+    skipped: data?.skipped ?? 0,
+    errors: data?.errors ?? [],
+  }
+}
+
+// --- consultation letter ---------------------------------------------------
+
+/** Draft the letter that follows a consultation.
+ *
+ *  The material goes up from the page rather than being read back out of the
+ *  database, so the letter reflects a summary the clinician has edited but not
+ *  yet saved. Comes back as a draft to be corrected on screen — nothing is
+ *  stored server-side. */
+export async function createConsultationLetter(caseId, body) {
+  const data = await request(
+    'POST',
+    `${BASE_URL}/cases/${encodeURIComponent(caseId)}/consultation_letter`,
+    { body, what: 'Drafting the consultation letter' },
+  )
+  return {
+    case_id: toText(data?.case_id),
+    letter: toText(data?.letter),
+    patient: {
+      name: toText(data?.patient?.name),
+      age: toText(data?.patient?.age),
+      gender: toText(data?.patient?.gender),
+      contact: toText(data?.patient?.contact),
+    },
+    consultant_name: toText(data?.consultant_name),
+    consultant_role: toText(data?.consultant_role),
+    context_id: toText(data?.context_id),
+    errors: data?.errors ?? [],
+  }
+}
+
 // --- my today -------------------------------------------------------------
 
 /** One team's day in counts. `date` is a local YYYY-MM-DD; omitting it lets
  *  the server use its own today. */
-export async function getTodaySummary(consultantTeamId, date, { refresh } = {}) {
+export async function getTodaySummary(consultantTeamId, date) {
   const data = await request(
     'GET',
-    url('/today', {
-      consultant_team_id: consultantTeamId,
-      date,
-      // Only sent when asked for: the stored briefing is the normal path.
-      refresh: refresh ? 'true' : undefined,
-    }),
+    url('/today', { consultant_team_id: consultantTeamId, date }),
     { what: "Loading today's summary" },
   )
   return {
@@ -861,7 +1019,6 @@ export async function getTodaySummary(consultantTeamId, date, { refresh } = {}) 
     post_surgery_consultations: data?.post_surgery_consultations ?? 0,
     high_flag_cases: data?.high_flag_cases ?? 0,
     summary_text: toText(data?.summary_text),
-    briefing_by_corti: Boolean(data?.briefing_by_corti),
     appointments: (data?.appointments ?? []).map((item) => ({
       appointment_id: item?.appointment_id ?? '',
       case_id: item?.case_id ?? '',
@@ -873,29 +1030,6 @@ export async function getTodaySummary(consultantTeamId, date, { refresh } = {}) 
       patient_gender: toText(item?.patient_gender),
       flags: item?.flags ?? [],
       has_high_flag: Boolean(item?.has_high_flag),
-    })),
-  }
-}
-
-/** Read a briefing aloud through ElevenLabs.
- *
- *  Goes via our backend, not straight to ElevenLabs — the API key stays on
- *  the server. Comes back with the audio and the timing of each sentence, so
- *  the page can follow along as it plays. */
-export async function speakBriefing(text) {
-  const data = await request('POST', `${BASE_URL}/today/speech`, {
-    body: { text },
-    what: 'Preparing the audio',
-  })
-  return {
-    audio_base64: data?.audio_base64 ?? '',
-    duration_seconds: data?.duration_seconds ?? 0,
-    sentences: (data?.sentences ?? []).map((item) => ({
-      text: toText(item?.text),
-      start: item?.start ?? 0,
-      end: item?.end ?? 0,
-      start_seconds: item?.start_seconds ?? 0,
-      end_seconds: item?.end_seconds ?? 0,
     })),
   }
 }
