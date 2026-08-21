@@ -369,6 +369,15 @@ export const normaliseCaseDetail = (data) => {
     // Already-coded diagnoses, stored on the case. Present means the coding
     // endpoint does not need asking again.
     medical_codes: (data?.medical_codes ?? []).map(normaliseMedicalCode),
+    // Which questions this patient is asked. Empty means the form has not
+    // been personalised yet.
+    questionnaire_questions: (data?.questionnaire_questions ?? []).map(
+      (item) => ({
+        order: item?.order ?? 0,
+        question: toText(item?.question),
+        reason: toText(item?.reason),
+      }),
+    ),
     consultations,
     appointments: data?.appointments ?? [],
   }
@@ -907,6 +916,40 @@ export async function getMedicalCodes(caseId, { refresh = false } = {}) {
     system: data?.system ?? [],
     source_characters: data?.source_characters ?? 0,
     cached: Boolean(data?.cached),
+    errors: data?.errors ?? [],
+  }
+}
+
+// --- questionnaire personalisation -----------------------------------------
+
+/** Work out which of the standard questions this patient still needs asked.
+ *
+ *  `quiet`, like the coding call: the panel that asks for this reports its
+ *  own progress, and the rest of the case stays readable while it runs.
+ *
+ *  Never rejects on a Corti failure — the backend falls back to the whole
+ *  form and reports why in `errors`, because a patient asked too much is a
+ *  far smaller problem than a patient asked nothing.
+ */
+export async function personaliseQuestionnaire(caseId, { refresh = false } = {}) {
+  const data = await request(
+    'POST',
+    `${BASE_URL}/cases/${encodeURIComponent(caseId)}/questionnaire/personalise`,
+    {
+      body: { refresh },
+      what: 'Personalising the questionnaire',
+      quiet: true,
+    },
+  )
+  return {
+    case_id: toText(data?.case_id),
+    questions: (data?.questions ?? []).map((item) => ({
+      order: item?.order ?? 0,
+      question: toText(item?.question),
+      reason: toText(item?.reason),
+    })),
+    cached: Boolean(data?.cached),
+    skipped: data?.skipped ?? 0,
     errors: data?.errors ?? [],
   }
 }

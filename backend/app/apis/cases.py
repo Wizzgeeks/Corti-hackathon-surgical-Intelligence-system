@@ -153,7 +153,7 @@ from app.models import consultation as consultation_model
 from app.models import investigation as investigation_model
 from app.models import patient as patient_model
 from app.models import surgery as surgery_model
-from app.models.case import Case, Flag, MedicalCode, Referred_by
+from app.models.case import Case, Flag, MedicalCode, QuestionnaireQuestion, Referred_by
 from app.models.common import utcnow
 from app.models.enums import CaseStatus, FlagSeverity
 from app.models.patient import Patient
@@ -375,6 +375,12 @@ class CaseDetail(CaseSummary):
     # Carried on the detail so the case page can render the coding it
     # already has instead of asking the coding endpoint for it again.
     medical_codes: list[MedicalCode] = Field(default_factory=list)
+    # Which of the standard questions this patient is asked. Empty means the
+    # form has not been personalised yet, which is what the case page reacts
+    # to on load.
+    questionnaire_questions: list[QuestionnaireQuestion] = Field(
+        default_factory=list
+    )
     consultations: list[ConsultationDetail] = Field(default_factory=list)
     appointments: list[AppointmentDetail] = Field(default_factory=list)
     surgeries: list[SurgeryDetail] = Field(default_factory=list)
@@ -514,6 +520,7 @@ async def get_case(case_id: str) -> CaseDetail:
         **to_case_summary(doc, patient),
         referral_document_content=doc.get("referral_document_content", ""),
         medical_codes=doc.get("medical_codes") or [],
+        questionnaire_questions=doc.get("questionnaire_questions") or [],
         consultations=[
             ConsultationDetail(
                 consultation_id=_oid(c.get("_id")),

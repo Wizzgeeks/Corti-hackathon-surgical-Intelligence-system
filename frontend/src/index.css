@@ -1346,6 +1346,43 @@ textarea.input {
   color: var(--good);
 }
 
+/* ---------- patient questionnaire ---------- */
+
+/* Stands where the copy-link button will be, so the header row keeps its
+   shape rather than jumping when the form is ready. */
+.quest-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.quest-wait-text {
+  font-size: 13px;
+  color: var(--ink-3);
+  /* Each stage replaces the last in place; the fade keeps the swap from
+     reading as a flicker. */
+  animation: quest-fade var(--dur-3) var(--ease);
+}
+
+/* Doubled class so this wins regardless of source order — the base
+   `.spinner` rule is defined further down the file. */
+.spinner.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+@keyframes quest-fade {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
 /* ---------- medical coding ---------- */
 
 /* Sits under the case head, on a faint accent tint so it reads as derived

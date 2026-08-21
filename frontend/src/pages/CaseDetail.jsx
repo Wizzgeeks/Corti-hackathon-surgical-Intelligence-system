@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import BookAppointmentDialog from '../components/BookAppointmentDialog.jsx'
 import MedicalCoding from '../components/MedicalCoding.jsx'
+import QuestionnaireLink from '../components/QuestionnaireLink.jsx'
 import Investigations from '../components/Investigations.jsx'
 import RecordConsultationDialog from '../components/RecordConsultationDialog.jsx'
 import ConsultationSummaryField from '../components/ConsultationSummaryField.jsx'
@@ -12,6 +13,7 @@ import {
   deleteCase,
   getCaseDetail,
   getMedicalCodes,
+  personaliseQuestionnaire,
   patientFormLink,
   reconcileQuestionnaire,
   onCaseReassessed,
@@ -190,6 +192,9 @@ function CaseDetail({ isNew = false }) {
   const [agentRunPending, setAgentRunPending] = useState(false)
   /* Set only by the Recode button; the stored codes are used otherwise. */
   const [recoding, setRecoding] = useState(false)
+  /* Only whether the form has been settled, and what went wrong if it did
+     not — the questions themselves are never shown here. */
+  const [quest, setQuest] = useState({ done: false, error: '' })
 
   // Only the detail endpoint runs here; the list page fetches its own rows.
   const loadCase = useCallback(
@@ -284,6 +289,43 @@ function CaseDetail({ isNew = false }) {
     storedCodes.length,
     recoding,
   ])
+
+  /* Whether this case's form has been worked out already. A case that
+     arrives with questions on it has been personalised before. */
+  const personalised = (details?.questionnaire_questions ?? []).length > 0
+
+  /* Runs once, when a case that has never had it done is opened — the
+     questions are stored precisely so this is not redone on every visit.
+     Nothing here renders the questions; the case page only waits for them so
+     the link it hands out points at the right form.
+
+     The promise is held rather than a flag, so StrictMode's double-invoke
+     subscribes to the one call instead of starting a second. */
+  const questRef = useRef(null)
+
+  useEffect(() => {
+    if (isNew || !details || personalised || quest.done) return undefined
+
+    if (questRef.current?.caseId !== id) {
+      questRef.current = { caseId: id, promise: personaliseQuestionnaire(id) }
+    }
+
+    let cancelled = false
+    questRef.current.promise
+      .then((result) => {
+        if (!cancelled) setQuest({ done: true, error: result.errors?.[0] ?? '' })
+      })
+      .catch((exc) => {
+        if (!cancelled) setQuest({ done: true, error: exc.message })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id, isNew, details, personalised, quest.done])
+
+  /* The link is not worth handing out until the form behind it is settled. */
+  const questLoading =
+    !isNew && Boolean(details) && !personalised && !quest.done
 
   /* Explicitly asking for the case to be coded again — the only route past
      the stored codes. */
@@ -453,8 +495,9 @@ function CaseDetail({ isNew = false }) {
     }
 
     setSaveError('')
+    let created
     try {
-      await createCase(draft)
+      created = await createCase(draft)
     } catch (exc) {
       // Keep the form open with the user's edits intact so they can retry.
       setSaveError(exc.message)
@@ -465,7 +508,20 @@ function CaseDetail({ isNew = false }) {
     saveLatestCase(draft)
     setDetails(draft)
     setDraft(null)
-    navigate('/cases')
+
+    /* Straight to the case that was just made. Reviewing a referral and
+       opening the case it became are one job, and the case list in between
+       is a step back out of it.
+
+       `replace` so Back returns to wherever the referral came from rather
+       than to the new-case form, which has nothing left to save. Falls back
+       to the list if the API answered without an id — better a list than a
+       route to a case that may not exist. */
+    if (created?.case_id) {
+      navigate(`/cases/${created.case_id}`, { replace: true })
+    } else {
+      navigate('/cases', { replace: true })
+    }
   }
 
   return (
@@ -538,21 +594,21 @@ function CaseDetail({ isNew = false }) {
                   Edit
                 </button>
                 {/* The patient's own form. Copied rather than opened: it is
-                    sent to them, not used from here. */}
+                    sent to them, not used from here. Personalising the form
+                    is waited out in place of the button — the link is not
+                    worth sending until it points at the right questions. */}
                 {!isNew && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={async () => {
+                  <QuestionnaireLink
+                    loading={questLoading}
+                    copied={linkCopied}
+                    onCopy={async () => {
                       await navigator.clipboard?.writeText(
                         patientFormLink(record.case_id),
                       )
                       setLinkCopied(true)
                       setTimeout(() => setLinkCopied(false), 2000)
                     }}
-                  >
-                    {linkCopied ? 'Link copied' : 'Copy patient form link'}
-                  </button>
+                  />
                 )}
                 {/* A case that has not been saved yet has nothing to delete. */}
                 {!isNew && (

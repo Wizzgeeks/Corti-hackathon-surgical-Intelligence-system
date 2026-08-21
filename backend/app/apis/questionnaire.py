@@ -25,6 +25,7 @@ login and anyone holding it can call these.
 """
 
 import logging
+import re
 from typing import Any
 
 from bson import ObjectId
@@ -36,8 +37,9 @@ from app.models import case as case_model
 from app.models import patient as patient_model
 from app.models import patient_questionnaire as questionnaire_model
 from app.models.common import utcnow
+from app.models.case import QuestionnaireQuestion
 from app.models.patient_questionnaire import PatientQuestionnaire
-from app.services.corti_textgen import extract_facts, format_facts
+from app.services.corti_textgen import extract_facts, format_facts, generate_text
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +70,64 @@ QUESTIONS: tuple[str, ...] = (
 class QuestionItem(BaseModel):
     order: int
     question: str
+    reason: str = ""
+
+
+# --- personalising the form ------------------------------------------------
+
+# A patient will not work through a long form, and the ones that matter are
+# at the top of it. Anything past this is dropped.
+MAX_QUESTIONS = 4
+
+PERSONALISE_PROMPT = (
+    "You are preparing a pre-appointment questionnaire for a patient. "
+    "You are given the clinical background already on file, and a numbered "
+    "list of standard questions."
+)
+
+PERSONALISE_CONTENT_PROMPT = (
+    "Decide which of the numbered questions still need to be asked, and pick "
+    "at most FOUR of them — the four that would change this patient's care "
+    "the most. "
+    "A question should be SKIPPED when the clinical background already "
+    "answers it clearly and specifically. Prefer questions the background is "
+    "silent on, and questions only the patient can answer — allergies, "
+    "medication, accessibility needs, workplace injury, insurance — over "
+    "ones the notes already cover. "
+    "Reply with nothing but the numbers of the questions to ASK, separated "
+    "by commas, MOST IMPORTANT FIRST. At most four numbers. No words, no "
+    "explanation, no punctuation other than the commas. Example: 5,3,9,1"
+)
+
+
+def personalise_context(clinical_background: str) -> str:
+    """The background and the numbered form, as one block of text."""
+    numbered = "\n".join(
+        f"{index + 1}. {question}" for index, question in enumerate(QUESTIONS)
+    )
+    background = (clinical_background or "").strip() or "(nothing on file)"
+    return (
+        f"CLINICAL BACKGROUND ALREADY ON FILE:\n{background}\n\n"
+        f"STANDARD QUESTIONS:\n{numbered}"
+    )
+
+
+def parse_question_numbers(text: str) -> list[int]:
+    """Read "5,3,9" back into question numbers, most important first.
+
+    Tolerant of the model answering with prose around the list: every number
+    in range is taken, anything else ignored. The order it answered in is
+    kept — it is asked for most-important-first, and that is what decides
+    which survive the cap — while duplicates are dropped.
+    """
+    seen: list[int] = []
+    for chunk in re.findall(r"\d+", text or ""):
+        number = int(chunk)
+        if 1 <= number <= len(QUESTIONS) and number not in seen:
+            seen.append(number)
+    return seen
+
+
 
 
 class QuestionnaireForm(BaseModel):
@@ -134,6 +194,128 @@ def referrer_line(case: dict) -> str:
     return who
 
 
+class PersonaliseRequest(BaseModel):
+    # Work it out again even though the case already has a set.
+    refresh: bool = False
+
+
+class PersonaliseResponse(BaseModel):
+    case_id: str
+    questions: list[QuestionItem] = Field(default_factory=list)
+    # True when these came off the case rather than from Corti just now.
+    cached: bool = False
+    # How many of the standard questions were dropped as already answered.
+    skipped: int = 0
+    errors: list[str] = Field(default_factory=list)
+
+
+def fallback_questions() -> list[QuestionItem]:
+    """What to ask when personalising could not be done.
+
+    The first few of the standard form rather than all nine: the cap is a
+    promise to the patient about how long this takes, and a failure upstream
+    is not a reason to break it.
+    """
+    return [
+        QuestionItem(order=index + 1, question=question)
+        for index, question in enumerate(QUESTIONS[:MAX_QUESTIONS])
+    ]
+
+
+@router.post(
+    "/cases/{case_id}/questionnaire/personalise",
+    response_model=PersonaliseResponse,
+)
+async def personalise_questionnaire(
+    case_id: str, payload: PersonaliseRequest | None = None
+) -> PersonaliseResponse:
+    """Work out which questions this patient still needs to be asked.
+
+    The clinical background and the standard form go to Corti together, and
+    what comes back is the numbers of the questions the background does not
+    already answer. Those are stored on the case, so the patient's link and
+    every later read use the same set.
+
+    Safe by default: if Corti fails, or answers with nothing usable, the case
+    keeps the whole form. Asking a patient a question twice is a small cost;
+    never asking is not.
+    """
+    options = payload or PersonaliseRequest()
+    oid = case_oid(case_id)
+    case = await load_case(case_id)
+
+    stored = case.get("questionnaire_questions") or []
+    if stored and not options.refresh:
+        return PersonaliseResponse(
+            case_id=case_id,
+            questions=[QuestionItem(**item) for item in stored],
+            cached=True,
+            skipped=len(QUESTIONS) - len(stored),
+        )
+
+    errors: list[str] = []
+    numbers: list[int] = []
+    try:
+        result = await generate_text(
+            name="Questionnaire personalisation",
+            heading="Questions to ask",
+            prompt=PERSONALISE_PROMPT,
+            content_prompt=PERSONALISE_CONTENT_PROMPT,
+            context_text=personalise_context(case.get("clinical_background") or ""),
+            access_token=None,
+        )
+        numbers = parse_question_numbers(result.text)
+        if not numbers:
+            errors.append(
+                "The model did not name any questions, so the whole form is "
+                "being asked."
+            )
+    except Exception as exc:  # noqa: BLE001 - reported, never fatal
+        logger.exception("questionnaire personalisation failed for %s", case_id)
+        errors.append(f"Could not personalise the form: {exc}")
+
+    # Capped by priority — the model answers most-important-first — then put
+    # back into form order, which is the order they read best in.
+    chosen = sorted(numbers[:MAX_QUESTIONS])
+    questions = (
+        [
+            QuestionItem(order=number, question=QUESTIONS[number - 1])
+            for number in chosen
+        ]
+        if chosen
+        else fallback_questions()
+    )
+
+    await get_collection(case_model.COLLECTION).update_one(
+        {"_id": oid},
+        {
+            "$set": {
+                "questionnaire_questions": [
+                    QuestionnaireQuestion(**item.model_dump()).model_dump(mode="json")
+                    for item in questions
+                ],
+                "questionnaire_generated_at": utcnow(),
+                "updated_at": utcnow(),
+            }
+        },
+    )
+
+    logger.info(
+        "personalise_questionnaire: case %s -> %d of %d question(s), %d error(s)",
+        case_id,
+        len(questions),
+        len(QUESTIONS),
+        len(errors),
+    )
+
+    return PersonaliseResponse(
+        case_id=case_id,
+        questions=questions,
+        skipped=len(QUESTIONS) - len(questions),
+        errors=errors,
+    )
+
+
 @router.get(
     "/public/cases/{case_id}/questionnaire", response_model=QuestionnaireForm
 )
@@ -155,10 +337,14 @@ async def get_questionnaire(case_id: str) -> QuestionnaireForm:
         patient_name=patient_name,
         referred_by=referrer_line(case),
         completed=bool(case.get("patient_recording_completed")),
-        questions=[
-            QuestionItem(order=index + 1, question=question)
-            for index, question in enumerate(QUESTIONS)
-        ],
+        # The personalised set when one has been worked out; the whole form
+        # until then, so a link opened early still asks everything rather
+        # than nothing.
+        questions=(
+            [QuestionItem(**item) for item in stored]
+            if (stored := case.get("questionnaire_questions") or [])
+            else fallback_questions()
+        ),
     )
 
 
