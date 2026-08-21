@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import BookAppointmentDialog from '../components/BookAppointmentDialog.jsx'
 import MedicalCoding from '../components/MedicalCoding.jsx'
+import AgentThinking from '../components/AgentThinking.jsx'
 import QuestionnaireLink from '../components/QuestionnaireLink.jsx'
 import Investigations from '../components/Investigations.jsx'
 import RecordConsultationDialog from '../components/RecordConsultationDialog.jsx'
@@ -221,8 +222,17 @@ function CaseDetail({ isNew = false }) {
      saved, and its own call site reported anything that went wrong. */
   useEffect(
     () =>
-      onCaseReassessed(({ caseId, detail }) => {
-        if (caseId !== id || !detail) return
+      onCaseReassessed(({ caseId, pending, detail }) => {
+        if (caseId !== id) return
+        // The run starting, whichever route began it — opening an ungraded
+        // case, or saving an edit. The four agent-written sections wait
+        // rather than showing what the agents are in the middle of replacing.
+        if (pending) {
+          setAgentRunPending(true)
+          return
+        }
+        setAgentRunPending(false)
+        if (!detail) return
         setDetails(detail)
         setConsultations(detail.consultations ?? [])
       }),
@@ -357,12 +367,11 @@ function CaseDetail({ isNew = false }) {
            mount effect, so a run that comes back still empty does not
            re-trigger itself. */
         if (needsAgentRun(data)) {
-          setAgentRunPending(true)
-          reassessCase(id)
-            .catch(() => {
-              // Silent: the page already shows whatever the case does have.
-            })
-            .finally(() => setAgentRunPending(false))
+          // `reassessCase` announces both its start and its finish, and the
+          // subscriber above turns those into the sections' waiting state.
+          reassessCase(id).catch(() => {
+            // Silent: the page already shows whatever the case does have.
+          })
         }
       })
       .catch((exc) => {
@@ -739,30 +748,60 @@ function CaseDetail({ isNew = false }) {
                 identifying detail below it is reference, not the point. */}
             {!isNew && (
               <>
+                {/* Each of these four is written by its own agent, so each
+                    waits on its own rather than behind one shared spinner —
+                    they finish at different times and the ones already
+                    written stay readable. */}
                 <div className="prose-pair">
                   <section className="summary-box">
                     <h3 className="detail-title">Case summary</h3>
-                    <Clamped text={details.case_summary} />
+                    {agentRunPending ? (
+                      <AgentThinking agent="summary" />
+                    ) : (
+                      <Clamped text={details.case_summary} />
+                    )}
                   </section>
                   <section className="summary-box summary-box-alt">
                     <h3 className="detail-title">Recommendation</h3>
-                    <Clamped text={details.recommendation} />
+                    {agentRunPending ? (
+                      <AgentThinking agent="recommendation" />
+                    ) : (
+                      <Clamped text={details.recommendation} />
+                    )}
                   </section>
                 </div>
 
                 <div className="prose-pair">
-                  <FlagList flags={details.flags_list} fallback={details.flags} />
+                  {agentRunPending ? (
+                    <section className="summary-box summary-box-flag">
+                      <h3 className="detail-title">Flags</h3>
+                      <AgentThinking agent="flags" lines={2} />
+                    </section>
+                  ) : (
+                    <FlagList
+                      flags={details.flags_list}
+                      fallback={details.flags}
+                    />
+                  )}
                   <section className="summary-box summary-box-urgency">
                     <h3 className="detail-title">Urgency</h3>
-                    <p className="summary-text urgency-line">
-                      <span
-                        className={`sev sev-${details.is_urgent ? 'high' : 'low'}`}
-                      >
-                        {details.is_urgent ? 'Urgent' : 'Routine'}
-                      </span>
-                    </p>
-                    {details.urgency_reason && (
-                      <Clamped text={details.urgency_reason} lines={4} />
+                    {agentRunPending ? (
+                      <AgentThinking agent="urgency" lines={2} />
+                    ) : (
+                      <>
+                        <p className="summary-text urgency-line">
+                          <span
+                            className={`sev sev-${
+                              details.is_urgent ? 'high' : 'low'
+                            }`}
+                          >
+                            {details.is_urgent ? 'Urgent' : 'Routine'}
+                          </span>
+                        </p>
+                        {details.urgency_reason && (
+                          <Clamped text={details.urgency_reason} lines={4} />
+                        )}
+                      </>
                     )}
                   </section>
                 </div>

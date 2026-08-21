@@ -1346,6 +1346,98 @@ textarea.input {
   color: var(--good);
 }
 
+/* ---------- agent thinking ---------- */
+
+.agent-think {
+  padding: var(--sp-1) 0;
+}
+
+.agent-think-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+}
+
+.agent-think-text {
+  font-size: 13px;
+  color: var(--accent-ink);
+  /* Each message replaces the last in place; the fade keeps the swap from
+     reading as a flicker. */
+  animation: agent-fade var(--dur-3) var(--ease);
+}
+
+/* Three dots working, rather than a spinner — four spinners on one screen
+   reads as four things stuck. */
+.agent-dots {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+}
+
+.agent-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: agent-bounce 1.2s var(--ease) infinite;
+}
+
+.agent-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.agent-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.agent-skeleton {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.agent-skeleton-line {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--line);
+  animation: agent-pulse 1.6s var(--ease) infinite;
+}
+
+/* Ragged ends, so it reads as prose rather than a loading bar. */
+.agent-skeleton-line:last-child {
+  width: 62%;
+}
+
+.agent-skeleton-line:nth-child(2) {
+  width: 88%;
+}
+
+@keyframes agent-fade {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@keyframes agent-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+@keyframes agent-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
 /* ---------- patient questionnaire ---------- */
 
 /* Stands where the copy-link button will be, so the header row keeps its

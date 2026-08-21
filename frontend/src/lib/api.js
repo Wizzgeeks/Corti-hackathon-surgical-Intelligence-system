@@ -830,8 +830,9 @@ const caseWatchers = new Set()
 
 /** Listen for a reassessed case. Returns the unsubscribe function.
  *
- *  The payload is `{caseId, detail, error}` — `detail` is the reloaded case
- *  when the run succeeded, `error` the reason when it did not. */
+ *  The payload is `{caseId, pending, detail, error}` — `pending` marks the
+ *  run starting, `detail` is the reloaded case when it succeeded, `error`
+ *  the reason when it did not. */
 export function onCaseReassessed(listener) {
   caseWatchers.add(listener)
   return () => caseWatchers.delete(listener)
@@ -864,6 +865,11 @@ export async function reassessCase(caseId) {
   if (!caseId) return null
   const pending = reassessing.get(caseId)
   if (pending) return pending
+
+  // Announced before the call goes out, so a page showing this case can put
+  // its agent-written sections into a waiting state whichever route started
+  // the run — opening an ungraded case, or saving an edit.
+  announce({ caseId, pending: true })
 
   const run = (async () => {
     const agentRun = await updateAgentRun(caseId)
