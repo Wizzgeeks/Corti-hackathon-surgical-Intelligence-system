@@ -662,7 +662,7 @@ function CaseDetail({ isNew = false }) {
               {reconciling
                 ? 'Reconciling…'
                 : details.patient_recording_reconciled
-                  ? 'Reconcile again'
+                  ? 'Reconciled'
                   : 'Reconcile'}
             </button>
           </div>
