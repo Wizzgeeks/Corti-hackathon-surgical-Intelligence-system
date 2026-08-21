@@ -38,6 +38,36 @@
 
   --nav-w: 248px;
 
+  /* ---- spacing scale ----
+     Every gap/padding in this file should resolve to one of these. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* ---- surface tints ----
+     Section separation by background tone rather than hard rules.
+     All derived from the existing paper / ink-deep pair. */
+  --surface: var(--paper);
+  --surface-sunken: #00384008;
+  --tint-hover: #0038400a;
+  --tint-active: #00384014;
+  --tint-accent: #00a9bf0f;
+  --hairline: #00384012;
+
+  /* ---- interaction states ---- */
+  --focus-ring: 0 0 0 3px var(--accent-edge);
+  --disabled-opacity: 0.55;
+
+  /* ---- motion ---- */
+  --dur-1: 0.12s;
+  --dur-2: 0.18s;
+  --dur-3: 0.28s;
+
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color: var(--ink);
   background: var(--paper-2);
@@ -51,6 +81,34 @@
 
 body {
   margin: 0;
+}
+
+/* One focus treatment for everything reachable by keyboard. Individual
+   components may position it, but none should remove it. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* Disabled controls read as inert everywhere, without per-component rules. */
+:where(button, input, select, textarea):disabled {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* Motion is decoration here — drop it wholesale when asked to.
+   The spinner is exempt: it is the only animation carrying meaning, and it
+   has its own gentler pulse further down. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.spinner),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 h1,
