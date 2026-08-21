@@ -280,12 +280,45 @@ export const normaliseCaseDetail = (data) => {
     (data?.appointments ?? []).map((item) => [item.appointment_id, item]),
   )
 
-  const consultations = (data?.consultations ?? []).map((item, index) => {
+  /* Consultations arrive in the order they were written. Ordered here by
+     when they were booked, newest first, so the tab a clinician wants — the
+     appointment just had, or the one coming up — is the one already open.
+     One without an appointment has no date to sort on and keeps its place
+     at the end.
+
+     The numbering stays chronological: "Consultation 1" is the first the
+     patient attended whichever end of the list it is displayed at, so a
+     number in a note still means the same visit. */
+  const byStart = (item) => {
+    const start = appointments.get(item.appointment_id)?.start_time
+    const at = start ? new Date(start).getTime() : NaN
+    return Number.isNaN(at) ? null : at
+  }
+
+  const raw = data?.consultations ?? []
+  const dated = raw.filter((item) => byStart(item) !== null)
+  const undated = raw.filter((item) => byStart(item) === null)
+
+  // Numbered by when they happened, oldest first.
+  const numbers = new Map(
+    [...dated]
+      .sort((a, b) => byStart(a) - byStart(b))
+      .concat(undated)
+      .map((item, index) => [item, index + 1]),
+  )
+
+  // Displayed newest first, with the undated ones after the dated rather
+  // than ahead of them.
+  const ordered = [...dated]
+    .sort((a, b) => byStart(b) - byStart(a))
+    .concat(undated)
+
+  const consultations = ordered.map((item, index) => {
     const appointment = appointments.get(item.appointment_id)
     return {
       id: item.consultation_id ?? `c${index + 1}`,
       appointment_id: item.appointment_id ?? '',
-      label: `Consultation ${index + 1}`,
+      label: `Consultation ${numbers.get(item)}`,
       date: formatDate(appointment?.start_time),
       time: formatTime(appointment?.start_time),
       end_time: formatTime(appointment?.end_time),
@@ -882,15 +915,10 @@ export async function getMedicalCodes(caseId, { refresh = false } = {}) {
 
 /** One team's day in counts. `date` is a local YYYY-MM-DD; omitting it lets
  *  the server use its own today. */
-export async function getTodaySummary(consultantTeamId, date, { refresh } = {}) {
+export async function getTodaySummary(consultantTeamId, date) {
   const data = await request(
     'GET',
-    url('/today', {
-      consultant_team_id: consultantTeamId,
-      date,
-      // Only sent when asked for: the stored briefing is the normal path.
-      refresh: refresh ? 'true' : undefined,
-    }),
+    url('/today', { consultant_team_id: consultantTeamId, date }),
     { what: "Loading today's summary" },
   )
   return {
@@ -902,7 +930,6 @@ export async function getTodaySummary(consultantTeamId, date, { refresh } = {}) 
     post_surgery_consultations: data?.post_surgery_consultations ?? 0,
     high_flag_cases: data?.high_flag_cases ?? 0,
     summary_text: toText(data?.summary_text),
-    briefing_by_corti: Boolean(data?.briefing_by_corti),
     appointments: (data?.appointments ?? []).map((item) => ({
       appointment_id: item?.appointment_id ?? '',
       case_id: item?.case_id ?? '',
@@ -914,29 +941,6 @@ export async function getTodaySummary(consultantTeamId, date, { refresh } = {}) 
       patient_gender: toText(item?.patient_gender),
       flags: item?.flags ?? [],
       has_high_flag: Boolean(item?.has_high_flag),
-    })),
-  }
-}
-
-/** Read a briefing aloud through ElevenLabs.
- *
- *  Goes via our backend, not straight to ElevenLabs — the API key stays on
- *  the server. Comes back with the audio and the timing of each sentence, so
- *  the page can follow along as it plays. */
-export async function speakBriefing(text) {
-  const data = await request('POST', `${BASE_URL}/today/speech`, {
-    body: { text },
-    what: 'Preparing the audio',
-  })
-  return {
-    audio_base64: data?.audio_base64 ?? '',
-    duration_seconds: data?.duration_seconds ?? 0,
-    sentences: (data?.sentences ?? []).map((item) => ({
-      text: toText(item?.text),
-      start: item?.start ?? 0,
-      end: item?.end ?? 0,
-      start_seconds: item?.start_seconds ?? 0,
-      end_seconds: item?.end_seconds ?? 0,
     })),
   }
 }

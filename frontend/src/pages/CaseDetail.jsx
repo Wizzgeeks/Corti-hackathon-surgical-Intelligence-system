@@ -167,6 +167,10 @@ function CaseDetail({ isNew = false }) {
   })
   const [booking, setBooking] = useState(false)
   const [recording, setRecording] = useState(false)
+  /* The consultation whose recording is open, or null. Separate from
+     `recording` so a fresh recording and reviewing an old one cannot both
+     be on screen at once. */
+  const [openTranscript, setOpenTranscript] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [reconciling, setReconciling] = useState(false)
@@ -818,8 +822,35 @@ function CaseDetail({ isNew = false }) {
                 onSave={(value) =>
                   saveField(active.id, 'consultation_summary', value)
                 }
+                action={
+                  /* Offered once the summary is written and there is a
+                     recording behind it to check the summary against. */
+                  active.consultation_summary?.trim() &&
+                  active.transcription?.trim() ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => setOpenTranscript(active)}
+                    >
+                      View transcript
+                    </button>
+                  ) : null
+                }
               />
             </div>
+          )}
+
+          {/* The saved recording, reopened. The same dialog as a new
+              recording, seeded with what was already said, so resuming is
+              the control it always was rather than a second code path. */}
+          {openTranscript && (
+            <RecordConsultationDialog
+              key={`${openTranscript.id}-review`}
+              caseId={record.case_id}
+              initialTranscript={openTranscript.transcription}
+              resuming
+              onClose={() => setOpenTranscript(null)}
+            />
           )}
 
           {recording && (

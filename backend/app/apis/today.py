@@ -7,7 +7,6 @@ what else the case has booked, which is why this lives on the server rather
 than being assembled from several calls in the browser.
 
     GET  /today?consultant_team_id=...&date=2026-08-20
-    POST /today/speech   {"text": "..."}
 
     200 {
       "consultant_team_id": "6a855a...",
@@ -20,16 +19,17 @@ than being assembled from several calls in the browser.
       "post_surgery_consultations": 1,
       "high_flag_cases": 2,
       "appointments": [...],
-      "summary_text": "Good morning. Today you have 7 cases: ..."
+      "summary_text": "Thursday 20 August. You have 7 cases today: ..."
     }
 
     400 invalid team id or date
+
+The summary text is assembled here from what has already been loaded for the
+counts — no model call, so it costs nothing and can never disagree with the
+numbers shown beside it.
 """
 
-import hashlib
-import json
 import logging
-import re
 from datetime import date as date_type
 from datetime import datetime, time
 from typing import Any
@@ -39,14 +39,9 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.db.mongodb import get_collection
-from app.models.common import utcnow
-from app.models.daily_briefing import DailyBriefing
-from app.services.corti_textgen import generate_text
-from app.services.elevenlabs import SpeechError, speak
 from app.models import appointment as appointment_model
 from app.models import case as case_model
 from app.models import consultant_team as team_model
-from app.models import daily_briefing as briefing_model
 from app.models import patient as patient_model
 
 logger = logging.getLogger(__name__)
@@ -90,10 +85,8 @@ class TodaySummary(BaseModel):
     # Cases seen today carrying a high or critical flag.
     high_flag_cases: int = 0
     appointments: list[TodayAppointment] = Field(default_factory=list)
-    # The same day written out as prose, for reading aloud on the way in.
+    # The same day written out as prose, assembled from the fields above.
     summary_text: str = ""
-    # False when Corti was unreachable and the plain summary was used.
-    briefing_by_corti: bool = False
 
 
 def day_bounds(day: date_type) -> tuple[datetime, datetime]:
@@ -138,18 +131,32 @@ def describe_patient(patient: dict | None) -> str:
     return ", ".join(parts)
 
 
+def tidy(note: str) -> str:
+    """Case notes are stored as they were written — sometimes several quoted
+    paragraphs. Flattened to one run of prose so the briefing reads as one
+    voice rather than pasted material."""
+    text = " ".join(note.split()).strip().strip('"').replace('",\n"', " ")
+    text = " ".join(text.replace('", "', " ").split())
+    return text if text.endswith((".", "!", "?")) else f"{text}."
+
+
 def build_briefing(
     day: date_type,
     team_name: str,
     counts: dict[str, int],
     items: list[TodayAppointment],
+    case_notes: dict[str, dict[str, Any]] | None = None,
 ) -> str:
-    """The day as prose, for a screen reader or the car.
+    """The day as prose, assembled from what the page already knows.
 
-    Written to be *heard*: short sentences, no abbreviations a speech engine
-    would spell out, and the flagged patients called out by name rather than
-    left as a number the listener has to hold on to.
+    Short sentences, no abbreviations, and the flagged patients called out by
+    name rather than left as a number the reader has to hold on to. Where a
+    case carries a summary or a recommendation it is added to that patient’s
+    sentence, so the briefing says what today is about and not merely who is
+    booked.
     """
+    case_notes = case_notes or {}
+    described: set[str] = set()
     when = day.strftime("%A %d %B")
     who = f" for {team_name}" if team_name else ""
 
@@ -194,173 +201,27 @@ def build_briefing(
         if item.patient_gender:
             sentence += f", {item.patient_gender.lower()}"
         sentence += f". {kind.capitalize()}."
-        if item.flags:
+        # A case booked twice in one day — a clinic visit and its operation —
+        # would otherwise have its flags and notes read out twice over.
+        first_mention = item.case_id not in described
+        if item.case_id:
+            described.add(item.case_id)
+        if item.flags and first_mention:
             sentence += " Flags: " + "; ".join(item.flags) + "."
+        notes = case_notes.get(item.case_id) or {} if first_mention else {}
+        if notes.get("case_summary"):
+            sentence += " " + tidy(notes["case_summary"])
+        if notes.get("recommendation"):
+            sentence += " Recommended: " + tidy(notes["recommendation"])
         lines.append(sentence)
 
     return " ".join(lines)
-
-
-BRIEFING_NAME = "Daily consultant briefing"
-BRIEFING_HEADING = "Today"
-BRIEFING_PROMPT = (
-    "You are briefing a consultant on their clinic list before they arrive. "
-    "Write it to be listened to, not read: short sentences, no abbreviations, "
-    "no headings, no bullet points, no markdown."
-)
-BRIEFING_CONTENT_PROMPT = (
-    "Open with the date and how many cases, consultations and surgeries there "
-    "are. Then take each appointment in time order and say the time, the "
-    "patient's name, their age and sex, and whether it is a new consultation, "
-    "a follow-up, a post-surgery review or a surgery. Where a case carries "
-    "flags, say what they are and how severe. Mention anything in the case "
-    "summary or recommendation that changes what the consultant should do "
-    "today. Do not invent anything that is not in the material given."
-)
-BRIEFING_STYLE = "Plain spoken English, calm and factual, in the second person."
-
-
-def briefing_context(
-    day: date_type, team_name: str, totals: dict[str, int], items: list[TodayAppointment],
-    case_notes: dict[str, dict[str, Any]],
-) -> str:
-    """The material Corti writes the briefing from.
-
-    Handed over as plain text rather than JSON: the model is being asked to
-    speak it, and the shape of the day reads better than a data structure.
-    """
-    lines = [
-        f"Date: {day.strftime('%A %d %B %Y')}",
-        f"Consultant: {team_name or 'unnamed'}",
-        (
-            f"Totals: {totals['cases']} cases, {totals['consultations']} "
-            f"consultations, {totals['surgeries']} surgeries, "
-            f"{totals['new_consultations']} new, "
-            f"{totals['follow_up_consultations']} follow-up, "
-            f"{totals['post_surgery_consultations']} post-surgery, "
-            f"{totals['high_flag_cases']} with a high flag."
-        ),
-        "",
-        "Appointments:",
-    ]
-    for item in items:
-        kind = CATEGORY_WORDS.get(item.category) or item.appointment_type
-        line = (
-            f"- {item.time} {item.patient_name}"
-            f"{f', {item.patient_age}' if item.patient_age else ''}"
-            f"{f', {item.patient_gender}' if item.patient_gender else ''}. {kind}."
-        )
-        if item.flags:
-            line += " Flags: " + "; ".join(item.flags) + "."
-        notes = case_notes.get(item.case_id) or {}
-        if notes.get("case_summary"):
-            line += f" Case summary: {notes['case_summary']}"
-        if notes.get("recommendation"):
-            line += f" Recommendation: {notes['recommendation']}"
-        lines.append(line)
-    return "\n".join(lines)
-
-
-def fingerprint(items: list[TodayAppointment], totals: dict[str, int]) -> str:
-    """Identifies the day's list, so a stored briefing can be spotted as stale.
-
-    Covers what a briefing would have to change for: who is booked, when, what
-    kind of appointment, and what is flagged.
-    """
-    material = json.dumps(
-        {
-            "totals": totals,
-            "items": [
-                [i.appointment_id, i.time, i.category, i.patient_name, i.flags]
-                for i in items
-            ],
-        },
-        sort_keys=True,
-        default=str,
-    )
-    return hashlib.sha256(material.encode()).hexdigest()
-
-
-async def briefing_for_day(
-    team_oid: ObjectId,
-    day: date_type,
-    team_name: str,
-    totals: dict[str, int],
-    items: list[TodayAppointment],
-    case_notes: dict[str, dict[str, Any]],
-    refresh: bool = False,
-) -> tuple[str, bool]:
-    """The stored briefing for this team and day, generating one if needed.
-
-    Returns `(text, from_corti)`. Regenerated when the day's list has changed
-    since it was written, or when `refresh` is asked for — otherwise the
-    stored one is returned untouched, which is the common case: the page is
-    opened repeatedly through a morning that does not change.
-
-    A Corti failure is not fatal. The plainly-assembled summary is stored
-    instead and marked as such, so the page always has something to read and
-    the next request tries Corti again.
-    """
-    briefings = get_collection(briefing_model.COLLECTION)
-    key = {"consultant": team_oid, "date": str(day)}
-    stamp = fingerprint(items, totals)
-
-    stored = await briefings.find_one(key)
-    if (
-        stored
-        and not refresh
-        and stored.get("source_fingerprint") == stamp
-        and stored.get("text")
-        and stored.get("generated_by_corti")
-    ):
-        return stored["text"], True
-
-    fallback = build_briefing(day, team_name, totals, items)
-    text, by_corti = fallback, False
-
-    if items:
-        try:
-            result = await generate_text(
-                name=BRIEFING_NAME,
-                heading=BRIEFING_HEADING,
-                prompt=BRIEFING_PROMPT,
-                content_prompt=BRIEFING_CONTENT_PROMPT,
-                context_text=briefing_context(day, team_name, totals, items, case_notes),
-                access_token=None,
-                writing_style_prompt=BRIEFING_STYLE,
-            )
-        except Exception as exc:  # noqa: BLE001 — the day still needs a briefing
-            logger.warning("Corti could not write the briefing: %s", exc)
-        else:
-            if (result.text or "").strip():
-                text, by_corti = result.text.strip(), True
-
-    record = DailyBriefing(
-        consultant=team_oid,
-        date=str(day),
-        text=text,
-        source_fingerprint=stamp,
-        generated_at=utcnow(),
-        generated_by_corti=by_corti,
-    ).to_mongo()
-    # Replaced rather than appended: one briefing per team per day.
-    await briefings.update_one(key, {"$set": record}, upsert=True)
-    logger.info(
-        "Briefing for %s on %s %s.",
-        team_oid,
-        day,
-        "written by Corti" if by_corti else "assembled locally",
-    )
-    return text, by_corti
 
 
 @router.get("/today", response_model=TodaySummary)
 async def today_summary(
     consultant_team_id: str = Query(..., description="The team whose day this is."),
     day: date_type | None = Query(None, alias="date"),
-    refresh: bool = Query(
-        False, description="Rewrite the briefing even if a current one is stored."
-    ),
 ) -> TodaySummary:
     """Summarise one team's day."""
     if not ObjectId.is_valid(consultant_team_id):
@@ -516,107 +377,11 @@ async def today_summary(
     )
 
     team_name = str((team or {}).get("name") or "")
-    summary_text, by_corti = await briefing_for_day(
-        team_oid, day, team_name, totals, items, case_notes, refresh=refresh
-    )
 
     return TodaySummary(
         consultant_team_id=consultant_team_id,
         date=day,
         **totals,
         appointments=items,
-        summary_text=summary_text,
-        briefing_by_corti=by_corti,
-    )
-
-
-# --- Reading it out --------------------------------------------------------
-
-# Sentence-ish: everything up to a full stop, question or exclamation mark.
-SENTENCE = re.compile(r"[^.!?]+[.!?]*", re.S)
-
-
-class SpeechRequest(BaseModel):
-    text: str
-
-
-class SentenceSpan(BaseModel):
-    """One sentence, and when it is spoken."""
-
-    text: str
-    # Offsets into the original text, so the page highlights the exact run.
-    start: int
-    end: int
-    start_seconds: float = 0.0
-    end_seconds: float = 0.0
-
-
-class SpeechResponse(BaseModel):
-    # mp3, base64 — played straight from a data URL.
-    audio_base64: str
-    duration_seconds: float = 0.0
-    sentences: list[SentenceSpan] = Field(default_factory=list)
-
-
-def sentence_spans(text: str, alignment: dict[str, Any]) -> list[SentenceSpan]:
-    """Turn per-character timings into per-sentence ones.
-
-    ElevenLabs times every character; a page cannot usefully highlight a
-    character, so each sentence takes the start of its first character and the
-    end of its last. The character list is assumed to line up with the text
-    that was sent — it does — but the indexes are clamped anyway, since being
-    one character short is not worth a 500.
-    """
-    starts = alignment.get("character_start_times_seconds") or []
-    ends = alignment.get("character_end_times_seconds") or []
-    if not starts or not ends:
-        return []
-
-    spans: list[SentenceSpan] = []
-    for match in SENTENCE.finditer(text):
-        body = match.group()
-        if not body.strip():
-            continue
-        first = min(match.start(), len(starts) - 1)
-        last = min(match.end() - 1, len(ends) - 1)
-        spans.append(
-            SentenceSpan(
-                text=body.strip(),
-                start=match.start(),
-                end=match.end(),
-                start_seconds=float(starts[first]),
-                end_seconds=float(ends[last]),
-            )
-        )
-    return spans
-
-
-@router.post("/today/speech", response_model=SpeechResponse)
-async def speak_briefing(payload: SpeechRequest) -> SpeechResponse:
-    """Read a briefing aloud.
-
-    Proxied rather than called from the browser so the ElevenLabs key stays
-    on the server. The response carries the audio and the sentence timings
-    together, so the page can start playing and highlighting from one call.
-    """
-    text = (payload.text or "").strip()
-    if not text:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail="There is nothing to read out."
-        )
-
-    try:
-        result = await speak(text)
-    except SpeechError as exc:
-        # 401/402 are about the account, not the request — pass the reason
-        # through so the page can say which it was.
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY, detail=f"Text to speech failed: {exc}"
-        ) from exc
-
-    spans = sentence_spans(text, result["alignment"])
-    return SpeechResponse(
-        audio_base64=result["audio_base64"],
-        duration_seconds=spans[-1].end_seconds if spans else 0.0,
-        sentences=spans,
+        summary_text=build_briefing(day, team_name, totals, items, case_notes),
     )

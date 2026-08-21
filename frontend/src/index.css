@@ -1275,6 +1275,23 @@ textarea.input {
   margin-bottom: var(--sp-2);
 }
 
+/* The header's controls stay on one line beside the label rather than
+   wrapping under it as they are added to. */
+.field-head .row-actions {
+  flex: none;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .field-head {
+    flex-direction: column;
+  }
+
+  .field-head .row-actions {
+    justify-content: flex-start;
+  }
+}
+
 /* Saved prose, read rather than edited. Sits on a faint sunken tint so it
    reads as settled content instead of an empty input. */
 .field-text {
@@ -2355,6 +2372,14 @@ button.block {
 
 /* --- my today ------------------------------------------------------------ */
 
+/* Wraps on a narrow window so the button never sits on top of the picker. */
+.today-head-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .today-picker {
   display: flex;
   align-items: center;
@@ -2418,64 +2443,14 @@ button.block {
   color: var(--ink-3);
 }
 
-.briefing {
-  margin-top: 22px;
-  padding: 16px;
-  border: 1px solid var(--accent-edge);
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-}
-
-.briefing > .panel-head {
-  margin: 0 0 8px;
-  padding: 0;
-  border: 0;
-}
-
-.briefing .summary-text {
-  line-height: 1.6;
-}
-
-.briefing-controls {
+.briefing-actions {
   display: flex;
   gap: 8px;
 }
 
-/* --- briefing player ----------------------------------------------------- */
-
-.briefing-player {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* Driven by the audio itself, so it only moves when there is a voice. */
-.eq-briefing {
-  height: 38px;
-  gap: 3px;
-  padding: 0 6px;
-  border: 1px solid var(--accent-edge);
-  border-radius: var(--radius-sm);
-  background: var(--paper);
-}
-
+/* The day can run long; the card scrolls rather than the page behind it. */
 .briefing-text {
+  max-height: 60vh;
+  overflow-y: auto;
   line-height: 1.7;
-}
-
-/* Each sentence is its own target: tapping one plays from there. */
-.briefing-sentence {
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.briefing-sentence:hover {
-  background: var(--paper-2);
-}
-
-.briefing-sentence.is-active {
-  background: var(--accent);
-  color: var(--paper);
-  box-shadow: 0 0 0 3px var(--accent);
 }

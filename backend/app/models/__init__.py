@@ -3,7 +3,6 @@ from app.models.case import Case, Flag, MedicalCode
 from app.models.common import MongoModel, PyObjectId, utcnow
 from app.models.consultant_team import ConsultantTeam
 from app.models.consultation import Consultation
-from app.models.daily_briefing import DailyBriefing
 from app.models.contact import Contact
 from app.models.investigation import InvestigationDetails
 from app.models.enums import (
@@ -25,7 +24,6 @@ __all__ = [
     "CaseStatus",
     "ConsultantTeam",
     "Consultation",
-    "DailyBriefing",
     "Contact",
     "Flag",
     "FlagSeverity",

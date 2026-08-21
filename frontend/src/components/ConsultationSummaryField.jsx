@@ -12,7 +12,7 @@ const FIELD_KEY = 'consultation_summary'
  * once and re-read many times, so the default view is the reading view;
  * an always-open textarea makes settled text look like unfinished input.
  */
-function ConsultationSummaryField({ value, onSave }) {
+function ConsultationSummaryField({ value, onSave, action }) {
   const [draft, setDraft] = useState(value)
   const [editing, setEditing] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -56,11 +56,16 @@ function ConsultationSummaryField({ value, onSave }) {
             Findings, decisions and the plan agreed during the consultation.
           </p>
         </div>
-        {!editing && (
-          <button type="button" className="btn btn-sm" onClick={startEditing}>
-            {text ? 'Edit' : 'Add summary'}
-          </button>
-        )}
+        {/* `action` is whatever the case page wants offered alongside the
+            summary — the recording it was written from, today. */}
+        <div className="row-actions">
+          {!editing && action}
+          {!editing && (
+            <button type="button" className="btn btn-sm" onClick={startEditing}>
+              {text ? 'Edit' : 'Add summary'}
+            </button>
+          )}
+        </div>
       </div>
 
       {editing ? (

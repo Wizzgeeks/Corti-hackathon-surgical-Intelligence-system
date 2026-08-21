@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import SpokenBriefing from '../components/SpokenBriefing.jsx'
 import { getTodaySummary, listTeams } from '../lib/api.js'
 import { toKey } from '../lib/date.js'
 
@@ -22,6 +21,56 @@ function Stat({ label, value, tone }) {
 }
 
 /**
+ * The day as prose, in a popup.
+ *
+ * Kept out of the page itself: it repeats what the table below says, so it is
+ * there when you want to read the day in one go and out of the way when you
+ * do not.
+ */
+function BriefingDialog({ text, onClose }) {
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Today, in short"
+      // Clicking the backdrop closes; clicking the card must not.
+      onClick={onClose}
+    >
+      <div
+        className="modal modal-wide"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="panel-head">
+          <h2>Today, in short</h2>
+          <div className="briefing-actions">
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => navigator.clipboard?.writeText(text)}
+            >
+              Copy
+            </button>
+            <button type="button" className="btn btn-sm" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        </div>
+        <p className="summary-text briefing-text">{text}</p>
+      </div>
+    </div>
+  )
+}
+
+/**
  * The consultant's day at a glance.
  *
  * The breakdown of consultations is derived server-side from what else each
@@ -35,6 +84,7 @@ function MyToday() {
   const [teamId, setTeamId] = useState('')
   const [summary, setSummary] = useState(null)
   const [error, setError] = useState('')
+  const [showBriefing, setShowBriefing] = useState(false)
 
   const today = toKey(new Date())
 
@@ -55,33 +105,18 @@ function MyToday() {
     }
   }, [])
 
-  const [rewriting, setRewriting] = useState(false)
-
-  const load = useCallback(
-    (options) => {
+  const load = useCallback(() => {
     if (!teamId) return undefined
-    return getTodaySummary(teamId, today, options)
+    return getTodaySummary(teamId, today)
       .then((data) => {
         setError('')
         setSummary(data)
       })
       .catch((exc) => setError(exc.message))
-    },
-    [teamId, today],
-  )
-
-  /** Ask Corti to write it again — for when the case notes changed but the
-   *  list of appointments did not, which the stored briefing cannot see. */
-  const rewrite = async () => {
-    setRewriting(true)
-    try {
-      await load({ refresh: true })
-    } finally {
-      setRewriting(false)
-    }
-  }
+  }, [teamId, today])
 
   useEffect(() => {
+    setShowBriefing(false)
     load()
   }, [load])
 
@@ -101,24 +136,36 @@ function MyToday() {
             {selected?.speciality ? ` · ${selected.speciality}` : ''}
           </p>
         </div>
-        <label className="today-picker">
-          <span className="field-label">Consultant</span>
-          <select
-            className="input"
-            value={teamId}
-            onChange={(event) => setTeamId(event.target.value)}
+        <div className="today-head-actions">
+          <button
+            type="button"
+            className="btn"
+            disabled={!summary}
+            onClick={() => setShowBriefing(true)}
           >
-            {teams.length === 0 && <option value="">No consultants yet</option>}
-            {teams.map((team) => (
-              <option
-                key={team.consultant_team_id}
-                value={team.consultant_team_id}
-              >
-                {team.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            View today in short
+          </button>
+          <label className="today-picker">
+            <span className="field-label">Consultant</span>
+            <select
+              className="input"
+              value={teamId}
+              onChange={(event) => setTeamId(event.target.value)}
+            >
+              {teams.length === 0 && (
+                <option value="">No consultants yet</option>
+              )}
+              {teams.map((team) => (
+                <option
+                  key={team.consultant_team_id}
+                  value={team.consultant_team_id}
+                >
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {error && (
@@ -153,31 +200,6 @@ function MyToday() {
               value={summary.post_surgery_consultations}
             />
           </div>
-
-          {/* The same day as prose. Read aloud on the way in, or scanned
-              here — the list below repeats it in a form you can click. */}
-          <section className="briefing">
-            <div className="panel-head">
-              <div>
-                <h3 className="detail-title">Today, out loud</h3>
-                {!summary.briefing_by_corti && summary.cases > 0 && (
-                  <p className="cell-sub">
-                    Written from the booking list — Corti was not reachable
-                    when this was generated.
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                className="btn btn-sm"
-                disabled={rewriting}
-                onClick={rewrite}
-              >
-                {rewriting ? 'Rewriting…' : 'Rewrite'}
-              </button>
-            </div>
-            <SpokenBriefing key={summary.summary_text} text={summary.summary_text} />
-          </section>
 
           {summary.appointments.length > 0 && (
             <div className="table-wrap">
@@ -236,6 +258,12 @@ function MyToday() {
             <p className="today-empty">Nothing booked for this consultant today.</p>
           )}
         </>
+      )}
+      {showBriefing && summary && (
+        <BriefingDialog
+          text={summary.summary_text}
+          onClose={() => setShowBriefing(false)}
+        />
       )}
     </section>
   )
