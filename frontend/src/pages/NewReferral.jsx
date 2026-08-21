@@ -76,7 +76,7 @@ function NewReferral() {
       <div className="panel-head">
         <div>
           <h2>New referral</h2>
-          <p>Upload the referral letter as a PDF to start triage.</p>
+          <p>Upload the referral letter as a PDF to create the case.</p>
         </div>
       </div>
 
@@ -160,7 +160,7 @@ function NewReferral() {
           className="btn btn-primary"
           disabled={!file || submitting}
         >
-          {submitting ? 'Triaging…' : 'Create referral'}
+          {submitting ? 'Creating case…' : 'Create referral'}
         </button>
       </div>
     </form>

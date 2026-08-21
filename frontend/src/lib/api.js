@@ -120,14 +120,14 @@ export async function uploadReferral(file) {
     // fetch only rejects on network/CORS failures — the request never
     // reached the server, so say so rather than reporting a status.
     throw new Error(
-      `Could not reach the triage API at ${BASE_URL}. Is the backend running?`,
+      `Could not reach the API at ${BASE_URL}. Is the backend running?`,
       { cause },
     )
   }
 
   if (!response.ok) {
     throw new Error(
-      `Triage failed (${response.status}). ${await errorMessage(response)}`.trim(),
+      `Could not read the referral (${response.status}). ${await errorMessage(response)}`.trim(),
     )
   }
 
@@ -413,12 +413,18 @@ const formatDateTime = (value) => {
   return time ? `${date} ${time}` : date
 }
 
-export async function getCaseDetail(caseId) {
-  return withLoading(async () =>
+/** `quiet` skips the full-screen loader, for the reload that follows an agent
+ *  run — the case page's own sections are already showing that work. */
+export async function getCaseDetail(caseId, { quiet = false } = {}) {
+  const fetchCase = async () =>
     normaliseCaseDetail(
-      await getJson(`${BASE_URL}${CASES_PATH}/${encodeURIComponent(caseId)}`, 'the case'),
-    ),
-  )
+      await request(
+        'GET',
+        `${BASE_URL}${CASES_PATH}/${encodeURIComponent(caseId)}`,
+        { what: 'Loading the case', quiet },
+      ),
+    )
+  return quiet ? fetchCase() : withLoading(fetchCase)
 }
 
 /** Flat UI field -> [group, API key] for PATCH /cases/{id}. */
@@ -849,10 +855,14 @@ function announce(payload) {
 }
 
 /** Re-grade a case's urgency with the Corti agent. */
+/** Quiet on purpose: the case page puts each agent-written section into its
+ *  own waiting state for this, and a full-screen overlay on top of that would
+ *  block the three sections that are still readable. */
 export async function updateAgentRun(caseId) {
   return request('POST', `${BASE_URL}/update_agent_run`, {
     body: { case_id: caseId },
     what: 'Reassessing urgency',
+    quiet: true,
   })
 }
 
@@ -873,7 +883,7 @@ export async function reassessCase(caseId) {
 
   const run = (async () => {
     const agentRun = await updateAgentRun(caseId)
-    const detail = await getCaseDetail(caseId)
+    const detail = await getCaseDetail(caseId, { quiet: true })
     return { caseId, agentRun, detail }
   })()
     .then((result) => {

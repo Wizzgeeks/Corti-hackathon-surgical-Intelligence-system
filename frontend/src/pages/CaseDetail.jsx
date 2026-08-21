@@ -404,11 +404,11 @@ function CaseDetail({ isNew = false }) {
   if (!record) {
     return (
       <section className="panel">
-        <h2>{isNew ? 'No triaged referral' : 'Case not found'}</h2>
+        <h2>{isNew ? 'No referral uploaded' : 'Case not found'}</h2>
         <p>
           {isNew ? (
             <>
-              Nothing has been triaged yet.{' '}
+              Nothing has been uploaded yet.{' '}
               <Link to="/referrals/new">Upload a referral PDF</Link> to start.
             </>
           ) : (
