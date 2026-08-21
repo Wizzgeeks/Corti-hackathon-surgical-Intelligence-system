@@ -65,6 +65,14 @@ if __name__ == "__main__":
         reload=True,
         reload_dirs=[
             str(backend_root / "app" / d)
-            for d in ("agents", "apis", "core", "db", "graph_workflow" "models", "services")
+            for d in (
+                "agents",
+                "apis",
+                "core",
+                "corti_agents",
+                "db",
+                "models",
+                "services",
+            )
         ],
     )
