@@ -11,6 +11,11 @@ from app.corti_agents.case_summariser import (
     CaseSummaryReply,
     summarise_case,
 )
+from app.corti_agents.consultation_letter_writer import (
+    CONSULTATION_LETTER_AGENT_ID,
+    ConsultationLetterReply,
+    write_consultation_letter,
+)
 from app.corti_agents.flag_detector import (
     FLAG_AGENT_ID,
     FlagReply,
@@ -30,6 +35,9 @@ from app.corti_agents.urgency_identifier import (
 
 __all__ = [
     "CASE_SUMMARY_AGENT_ID",
+    "CONSULTATION_LETTER_AGENT_ID",
+    "ConsultationLetterReply",
+    "write_consultation_letter",
     "FLAG_AGENT_ID",
     "NEXT_ACTION_AGENT_ID",
     "NextActionReply",

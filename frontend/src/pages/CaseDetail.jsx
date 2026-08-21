@@ -5,6 +5,7 @@ import MedicalCoding from '../components/MedicalCoding.jsx'
 import Investigations from '../components/Investigations.jsx'
 import RecordConsultationDialog from '../components/RecordConsultationDialog.jsx'
 import ConsultationSummaryField from '../components/ConsultationSummaryField.jsx'
+import ConsultationLetterDialog from '../components/ConsultationLetterDialog.jsx'
 import { initials } from '../data/cases.js'
 import {
   createCase,
@@ -171,6 +172,7 @@ function CaseDetail({ isNew = false }) {
      `recording` so a fresh recording and reviewing an old one cannot both
      be on screen at once. */
   const [openTranscript, setOpenTranscript] = useState(null)
+  const [letterFor, setLetterFor] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [reconciling, setReconciling] = useState(false)
@@ -823,17 +825,27 @@ function CaseDetail({ isNew = false }) {
                   saveField(active.id, 'consultation_summary', value)
                 }
                 action={
-                  /* Offered once the summary is written and there is a
-                     recording behind it to check the summary against. */
-                  active.consultation_summary?.trim() &&
-                  active.transcription?.trim() ? (
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      onClick={() => setOpenTranscript(active)}
-                    >
-                      View transcript
-                    </button>
+                  active.consultation_summary?.trim() ? (
+                    <>
+                      {/* Offered once the summary is written and there is a
+                          recording behind it to check the summary against. */}
+                      {active.transcription?.trim() && (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => setOpenTranscript(active)}
+                        >
+                          View transcript
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => setLetterFor(active)}
+                      >
+                        Download consultation letter
+                      </button>
+                    </>
                   ) : null
                 }
               />
@@ -852,6 +864,33 @@ function CaseDetail({ isNew = false }) {
               doctorName={openTranscript.consultant_name}
               patientName={record.patient_name}
               onClose={() => setOpenTranscript(null)}
+            />
+          )}
+
+          {/* The letter is written from this consultation, with the case's
+              earlier ones as the history behind it — oldest first, which is
+              the order they were written in rather than the order the tabs
+              show them. */}
+          {letterFor && (
+            <ConsultationLetterDialog
+              key={`${letterFor.id}-letter`}
+              caseId={record.case_id}
+              consultation={letterFor}
+              previousSummaries={consultations
+                .filter(
+                  (item) =>
+                    item.id !== letterFor.id &&
+                    item.consultation_summary?.trim(),
+                )
+                .map((item) => item.consultation_summary)
+                .reverse()}
+              patient={{
+                name: record.patient_name,
+                age: record.patient_age,
+                gender: record.patient_gender,
+                contact: record.patient_contact,
+              }}
+              onClose={() => setLetterFor(null)}
             />
           )}
 

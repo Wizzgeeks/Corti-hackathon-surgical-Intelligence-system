@@ -911,6 +911,36 @@ export async function getMedicalCodes(caseId, { refresh = false } = {}) {
   }
 }
 
+// --- consultation letter ---------------------------------------------------
+
+/** Draft the letter that follows a consultation.
+ *
+ *  The material goes up from the page rather than being read back out of the
+ *  database, so the letter reflects a summary the clinician has edited but not
+ *  yet saved. Comes back as a draft to be corrected on screen — nothing is
+ *  stored server-side. */
+export async function createConsultationLetter(caseId, body) {
+  const data = await request(
+    'POST',
+    `${BASE_URL}/cases/${encodeURIComponent(caseId)}/consultation_letter`,
+    { body, what: 'Drafting the consultation letter' },
+  )
+  return {
+    case_id: toText(data?.case_id),
+    letter: toText(data?.letter),
+    patient: {
+      name: toText(data?.patient?.name),
+      age: toText(data?.patient?.age),
+      gender: toText(data?.patient?.gender),
+      contact: toText(data?.patient?.contact),
+    },
+    consultant_name: toText(data?.consultant_name),
+    consultant_role: toText(data?.consultant_role),
+    context_id: toText(data?.context_id),
+    errors: data?.errors ?? [],
+  }
+}
+
 // --- my today -------------------------------------------------------------
 
 /** One team's day in counts. `date` is a local YYYY-MM-DD; omitting it lets

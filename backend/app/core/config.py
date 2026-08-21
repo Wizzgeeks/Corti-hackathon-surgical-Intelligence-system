@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     corti_case_summary_agent_id: str = "a8f527e0-ec46-4809-96d0-6afcf21ed199"
     corti_flag_agent_id: str = "7dcc2ffa-ff50-4aa7-88d7-bbe126d75f62"
     corti_next_action_agent_id: str = "e1f26bf9-dc7c-419f-a29b-52ec35d26d85"
+    corti_consultation_letter_agent_id: str = (
+        "c87093cd-975c-4de3-ac77-564eea80f96a"
+    )
     # Testing switch: answer from a canned response instead of calling
     # the agent.
     corti_urgency_agent_dummy: bool = False

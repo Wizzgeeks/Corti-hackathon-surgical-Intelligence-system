@@ -2454,3 +2454,100 @@ button.block {
   overflow-y: auto;
   line-height: 1.7;
 }
+
+/* --- consultation letter -------------------------------------------------- */
+
+.letter-modal {
+  width: min(820px, 100%);
+}
+
+.letter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Tall enough to read a page of the letter without scrolling for every edit. */
+.letter-textarea {
+  min-height: 55vh;
+  font-family: var(--font-body, inherit);
+  font-size: 14px;
+  line-height: 1.65;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+/* The printable letter: composed on screen, shown only to the printer. */
+.letter-sheet {
+  display: none;
+}
+
+.letter-body {
+  /* The agent writes in paragraphs and blank lines; they are the layout. */
+  white-space: pre-wrap;
+}
+
+@media print {
+  /* Everything but the letter is chrome — the page, the dialog, the backdrop
+     — so the sheet is lifted out of it rather than each part being hidden. */
+  body * {
+    visibility: hidden;
+  }
+
+  .letter-sheet,
+  .letter-sheet * {
+    visibility: visible;
+  }
+
+  .modal-backdrop {
+    position: static;
+    display: block;
+    padding: 0;
+    overflow: visible;
+    background: none;
+  }
+
+  .modal {
+    width: auto;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .letter-sheet {
+    display: block;
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0;
+    color: #000;
+    font-size: 12pt;
+    line-height: 1.6;
+  }
+
+  .letter-head {
+    margin-bottom: 24pt;
+    padding-bottom: 8pt;
+    border-bottom: 1px solid #000;
+  }
+
+  .letter-consultant {
+    margin: 0;
+    font-size: 14pt;
+    font-weight: 600;
+  }
+
+  .letter-role,
+  .letter-date {
+    margin: 2pt 0 0;
+    font-size: 11pt;
+  }
+
+  .letter-date {
+    margin-top: 8pt;
+  }
+
+  @page {
+    margin: 20mm;
+  }
+}
