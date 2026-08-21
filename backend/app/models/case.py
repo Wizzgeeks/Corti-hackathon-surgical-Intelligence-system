@@ -14,6 +14,23 @@ class Flag(BaseModel):
     severity: FlagSeverity = FlagSeverity.LOW
     rationale: str | None = None
 
+class MedicalCode(BaseModel):
+    """One coded diagnosis, as Corti's coding tool returned it.
+
+    Stored on the case rather than recomputed per view: coding costs a Corti
+    call, and the text it is derived from only changes when an agent run
+    rewrites it. `update_agent_run` clears these, which is what makes the
+    next read fetch fresh ones.
+    """
+
+    code: str = ""
+    description: str = ""
+    system: str = ""
+    # Corti does not always score a code.
+    confidence: float | None = None
+    evidence: str = ""
+
+
 class Referred_by(BaseModel):
     name: str
     role: str
@@ -33,6 +50,9 @@ class Case(MongoModel):
     # live on Consultation.
     pre_consultation_details: str | None = None
     notes: str | None = None
+    # Written by the coding tool from the consultation summaries; empty until
+    # the case has been consulted on, and cleared by every agent run.
+    medical_codes: list[MedicalCode] = Field(default_factory=list)
     is_urgent: bool = False
     urgency_reason: str | None = None
     # Set when the patient submits the public questionnaire, and again once a

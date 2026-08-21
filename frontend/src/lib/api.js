@@ -262,6 +262,15 @@ export async function listCases({ limit = 20, skip = 0, isUrgent } = {}) {
 
 /** GET /cases/{id} — the full case, flattened into the shape the detail
  *  page edits, with consultations resolved against their appointments. */
+/** One coded diagnosis from Corti. */
+export const normaliseMedicalCode = (item) => ({
+  code: toText(item?.code),
+  description: toText(item?.description),
+  system: toText(item?.system),
+  confidence: typeof item?.confidence === 'number' ? item.confidence : null,
+  evidence: toText(item?.evidence),
+})
+
 export const normaliseCaseDetail = (data) => {
   const patient = data?.patient ?? {}
   const referrers = data?.referred_by
@@ -324,6 +333,9 @@ export const normaliseCaseDetail = (data) => {
     is_urgent: Boolean(data?.is_urgent),
     urgency_reason: toText(data?.urgency_reason),
     referral_document_content: toText(data?.referral_document_content),
+    // Already-coded diagnoses, stored on the case. Present means the coding
+    // endpoint does not need asking again.
+    medical_codes: (data?.medical_codes ?? []).map(normaliseMedicalCode),
     consultations,
     appointments: data?.appointments ?? [],
   }
@@ -455,21 +467,26 @@ const inFlight = new Map()
 
 /** One JSON request, with the unreachable-vs-HTTP-error split every caller
  *  needs and the loader held for its duration. */
-async function request(method, target, { body, what } = {}) {
+async function request(method, target, { body, what, quiet } = {}) {
   if (method === 'GET') {
     const pending = inFlight.get(target)
     if (pending) return pending
-    const promise = sendRequest(method, target, { body, what }).finally(() => {
-      inFlight.delete(target)
-    })
+    const promise = sendRequest(method, target, { body, what, quiet }).finally(
+      () => {
+        inFlight.delete(target)
+      },
+    )
     inFlight.set(target, promise)
     return promise
   }
-  return sendRequest(method, target, { body, what })
+  return sendRequest(method, target, { body, what, quiet })
 }
 
-async function sendRequest(method, target, { body, what } = {}) {
-  return withLoading(async () => {
+/** `quiet` runs the call without the full-screen loader, for work a single
+ *  section reports on itself. Everything else about the call is unchanged. */
+async function sendRequest(method, target, { body, what, quiet } = {}) {
+  const hold = quiet ? (task) => task() : withLoading
+  return hold(async () => {
     let response
     try {
       response = await fetch(target, {
@@ -835,6 +852,30 @@ function reassessInBackground(caseId) {
   reassessCase(caseId).catch(() => {
     // Already announced to subscribers; nothing further to do here.
   })
+}
+
+// --- medical coding --------------------------------------------------------
+
+/** Code a case from its consultation summaries.
+ *
+ *  Deliberately `quiet`: the coding panel shows its own progress, and a
+ *  blocking overlay over the whole page for a side panel would be wrong.
+ *  A case with no consultation yet answers with an empty list and a reason,
+ *  not an error. */
+export async function getMedicalCodes(caseId, { refresh = false } = {}) {
+  const data = await request('POST', `${BASE_URL}/get_medical_codes`, {
+    body: { case_id: caseId, refresh },
+    what: 'Reading the medical codes',
+    quiet: true,
+  })
+  return {
+    case_id: toText(data?.case_id),
+    codes: (data?.codes ?? []).map(normaliseMedicalCode),
+    system: data?.system ?? [],
+    source_characters: data?.source_characters ?? 0,
+    cached: Boolean(data?.cached),
+    errors: data?.errors ?? [],
+  }
 }
 
 // --- my today -------------------------------------------------------------

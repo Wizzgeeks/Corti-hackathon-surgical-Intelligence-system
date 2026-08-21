@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import BookAppointmentDialog from '../components/BookAppointmentDialog.jsx'
+import MedicalCoding from '../components/MedicalCoding.jsx'
 import Investigations from '../components/Investigations.jsx'
 import RecordConsultationDialog from '../components/RecordConsultationDialog.jsx'
 import ConsultationSummaryField from '../components/ConsultationSummaryField.jsx'
@@ -9,9 +10,11 @@ import {
   createCase,
   deleteCase,
   getCaseDetail,
+  getMedicalCodes,
   patientFormLink,
   reconcileQuestionnaire,
   onCaseReassessed,
+  reassessCase,
   loadLatestCase,
   saveLatestCase,
   updateAppointment,
@@ -135,6 +138,17 @@ function EditField({
   )
 }
 
+/** True when the agent-graded part of a case is missing.
+ *
+ *  These four are all written by the same agent run, so any one of them
+ *  being blank means that run never landed. */
+const needsAgentRun = (data) =>
+  Boolean(data?.case_id) &&
+  (!data.case_summary?.trim() ||
+    !data.recommendation?.trim() ||
+    !data.urgency_reason?.trim() ||
+    (data.flags_list?.length ?? 0) === 0)
+
 function CaseDetail({ isNew = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -158,6 +172,18 @@ function CaseDetail({ isNew = false }) {
   const [reconciling, setReconciling] = useState(false)
   const [consultations, setConsultations] = useState([])
   const [activeTab, setActiveTab] = useState(null)
+  const [coding, setCoding] = useState({
+    // Which text these codes were produced from; '' means "not fetched yet".
+    signature: '',
+    codes: [],
+    error: '',
+    note: '',
+  })
+  /* Coding reads the summaries the agent run rewrites, so it waits for that
+     run rather than racing it. */
+  const [agentRunPending, setAgentRunPending] = useState(false)
+  /* Set only by the Recode button; the stored codes are used otherwise. */
+  const [recoding, setRecoding] = useState(false)
 
   // Only the detail endpoint runs here; the list page fetches its own rows.
   const loadCase = useCallback(
@@ -192,6 +218,81 @@ function CaseDetail({ isNew = false }) {
     [id],
   )
 
+  /* What the coding is derived from. Keyed on the summaries themselves so a
+     re-render, or an agent run that changed only the urgency, does not send
+     the same text to Corti again. */
+  const summarySignature = consultations
+    .map((item) => (item.consultation_summary ?? '').trim())
+    .filter(Boolean)
+    .join('\u0000')
+
+  /* Coding runs only once there is something to code, and only after any
+     agent run has settled — that run rewrites the case summary the coding
+     call sends along as background.
+
+     The result is stamped with the signature it was produced from, so
+     "still loading" is derived rather than stored: anything other than the
+     current signature means the codes on screen are not for this text. */
+  /* Codes the case already carries. An agent run clears them server-side,
+     so anything here is current for the summaries on screen. */
+  const storedCodes = details?.medical_codes ?? []
+
+  useEffect(() => {
+    if (isNew || !summarySignature || agentRunPending) return undefined
+    if (coding.signature === summarySignature) return undefined
+    // Already coded and saved: nothing to ask Corti for until the next
+    // agent run clears them.
+    if (storedCodes.length > 0 && !recoding) return undefined
+
+    let cancelled = false
+    getMedicalCodes(id, { refresh: recoding })
+      .then((result) => {
+        if (cancelled) return
+        setRecoding(false)
+        setCoding({
+          signature: summarySignature,
+          codes: result.codes,
+          error: '',
+          note: result.errors?.[0] ?? '',
+        })
+      })
+      .catch((exc) => {
+        if (cancelled) return
+        setRecoding(false)
+        setCoding({
+          signature: summarySignature,
+          codes: [],
+          error: exc.message,
+          note: '',
+        })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    id,
+    isNew,
+    summarySignature,
+    agentRunPending,
+    coding.signature,
+    storedCodes.length,
+    recoding,
+  ])
+
+  /* Explicitly asking for the case to be coded again — the only route past
+     the stored codes. */
+  const recode = () => {
+    setRecoding(true)
+    setCoding((prev) => ({ ...prev, signature: '' }))
+  }
+
+  /* Whatever was fetched this session, else what the case arrived with. */
+  const shownCodes = coding.signature ? coding.codes : storedCodes
+  const codingLoading =
+    Boolean(summarySignature) &&
+    coding.signature !== summarySignature &&
+    (storedCodes.length === 0 || recoding)
+
   useEffect(() => {
     if (isNew) return undefined
     let cancelled = false
@@ -202,6 +303,19 @@ function CaseDetail({ isNew = false }) {
         setDetails(data)
         setConsultations(data.consultations ?? [])
         setActiveTab(data.consultations?.[0]?.id ?? null)
+        /* A case that arrives without its graded fields has never had a
+           successful agent run — or lost it. Run one now and let the
+           subscriber above put the result on the page. Fired only from this
+           mount effect, so a run that comes back still empty does not
+           re-trigger itself. */
+        if (needsAgentRun(data)) {
+          setAgentRunPending(true)
+          reassessCase(id)
+            .catch(() => {
+              // Silent: the page already shows whatever the case does have.
+            })
+            .finally(() => setAgentRunPending(false))
+        }
       })
       .catch((exc) => {
         if (!cancelled) setLoadError(exc.message)
@@ -449,6 +563,16 @@ function CaseDetail({ isNew = false }) {
             )}
           </div>
         </div>
+
+        {!isNew && summarySignature && (
+          <MedicalCoding
+            codes={shownCodes}
+            loading={codingLoading}
+            error={coding.error}
+            note={coding.note}
+            onRetry={recode}
+          />
+        )}
 
         {!isNew && details.patient_recording_completed && (
           <div className="patient-status">
@@ -701,12 +825,12 @@ function CaseDetail({ isNew = false }) {
           {recording && (
             <RecordConsultationDialog
               caseId={record.case_id}
-              onClose={async () => {
+              onClose={() => {
+                // No refetch here: extracting the facts already re-runs the
+                // urgency agent, and that run reloads the case itself. The
+                // subscriber above puts the result on the page, so fetching
+                // again on the way out would only duplicate it.
                 setRecording(false)
-                // Extraction writes the transcript and the summary onto the
-                // consultation, so the page is refetched on the way out
-                // rather than left showing what it loaded before recording.
-                await loadCase({ keepTab: true })
               }}
             />
           )}

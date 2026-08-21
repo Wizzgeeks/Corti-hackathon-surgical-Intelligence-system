@@ -8,6 +8,7 @@ from app.apis.cases import router as cases_router
 from app.apis.consultations import router as consultations_router
 from app.apis.contacts import router as contacts_router
 from app.apis.investigations import router as investigations_router
+from app.apis.medical_codes import router as medical_codes_router
 from app.apis.questionnaire import router as questionnaire_router
 from app.apis.referrals import router as referrals_router
 from app.apis.teams import router as teams_router
@@ -18,6 +19,7 @@ api_router.include_router(referrals_router)
 api_router.include_router(cases_router)
 api_router.include_router(case_analysis_router)
 api_router.include_router(agent_runs_router)
+api_router.include_router(medical_codes_router)
 api_router.include_router(appointments_router)
 api_router.include_router(consultations_router)
 api_router.include_router(teams_router)

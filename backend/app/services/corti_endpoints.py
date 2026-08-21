@@ -96,6 +96,9 @@ class Paths:
 
     # Coding
     INTERACTION_CODES = "/interactions/{interaction_id}/codes/"
+    # Stateless coding: text in, codes out, nothing stored against an
+    # interaction. Trailing slash is required by Corti.
+    TOOLS_CODING = "/tools/coding/"
 
     # Agentic (A2A)
     AGENTS = "/agentic/agents"

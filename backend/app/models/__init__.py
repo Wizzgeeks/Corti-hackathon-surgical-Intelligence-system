@@ -1,5 +1,5 @@
 from app.models.appointment import Appointment
-from app.models.case import Case, Flag
+from app.models.case import Case, Flag, MedicalCode
 from app.models.common import MongoModel, PyObjectId, utcnow
 from app.models.consultant_team import ConsultantTeam
 from app.models.consultation import Consultation
@@ -31,6 +31,7 @@ __all__ = [
     "FlagSeverity",
     "InvestigationDetails",
     "InvestigationStatus",
+    "MedicalCode",
     "MongoModel",
     "Patient",
     "PatientQuestionnaire",

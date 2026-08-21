@@ -382,6 +382,11 @@ async def update_agent_run(payload: AgentRunRequest) -> AgentRunResponse:
                 Flag(**flag).model_dump(mode="json") for flag in flags_reply.flags
             ]
         if changes:
+            # The agent has just rewritten what the coding tool reads, so any
+            # stored codes are now for text that no longer exists. Clearing
+            # them is what makes the next /get_medical_codes call fetch fresh
+            # ones instead of serving the old set.
+            changes["medical_codes"] = []
             changes["updated_at"] = utcnow()
             await get_collection(case_model.COLLECTION).update_one(
                 {"_id": ObjectId(payload.case_id)}, {"$set": changes}

@@ -1263,6 +1263,41 @@ textarea.input {
   color: var(--ink-3);
 }
 
+/* Label block and its edit affordance sit on one line. */
+.field-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.field-head .field-hint {
+  margin-bottom: var(--sp-2);
+}
+
+/* Saved prose, read rather than edited. Sits on a faint sunken tint so it
+   reads as settled content instead of an empty input. */
+.field-text {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.field-empty {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  font-size: 14px;
+}
+
 .textarea {
   width: 100%;
   padding: 12px 14px;
@@ -1292,6 +1327,148 @@ textarea.input {
 .saved-note {
   font-size: 13px;
   color: var(--good);
+}
+
+/* ---------- medical coding ---------- */
+
+/* Sits under the case head, on a faint accent tint so it reads as derived
+   detail rather than another editable section of the case. */
+.coding {
+  margin-top: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--accent-edge);
+  border-radius: var(--radius);
+  background: var(--tint-accent);
+}
+
+.coding-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+
+.coding-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coding-chip {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease);
+}
+
+.coding-chip:hover {
+  border-color: var(--accent-bright);
+  box-shadow: var(--shadow);
+}
+
+.coding-code {
+  flex: none;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.coding-desc {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+/* The phrase the code was read from — supporting evidence, so it sits
+   quieter and on its own line. */
+.coding-evidence {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.coding-confidence {
+  flex: none;
+  padding: 1px var(--sp-2);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coding-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* Placeholder chips while Corti is coding: the panel holds its height so
+   the case below does not jump when the real codes arrive. */
+.coding-chip-skeleton {
+  border-color: var(--hairline);
+  background: var(--surface-sunken);
+  box-shadow: none;
+  animation: coding-pulse 1.4s var(--ease) infinite;
+}
+
+.coding-chip-skeleton .coding-code {
+  width: 54px;
+}
+
+.coding-chip-skeleton .coding-desc {
+  width: 140px;
+}
+
+.coding-chip-skeleton .coding-code,
+.coding-chip-skeleton .coding-desc {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.coding-chip-skeleton:nth-child(2) .coding-desc {
+  width: 200px;
+}
+
+.coding-chip-skeleton:nth-child(3) .coding-desc {
+  width: 110px;
+}
+
+@keyframes coding-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (max-width: 560px) {
+  .coding {
+    padding: var(--sp-3) var(--sp-4);
+  }
+
+  .coding-head {
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .coding-chip {
+    width: 100%;
+  }
 }
 
 /* ---------- upload form ---------- */
