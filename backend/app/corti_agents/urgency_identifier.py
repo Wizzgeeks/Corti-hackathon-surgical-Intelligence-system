@@ -69,8 +69,15 @@ class UrgencyReply:
 
     @property
     def recommendation(self) -> str:
-        """The urgency grade — ROUTINE, URGENT, and so on."""
-        return str(self.verdict.get("recommendation") or "")
+        """The urgency grade — ROUTINE, URGENT, and so on.
+
+        The agent names this `category` on some runs and `recommendation` on
+        others, so both are read; reading only one leaves the grade empty and
+        the case's urgency unset.
+        """
+        return str(
+            self.verdict.get("recommendation") or self.verdict.get("category") or ""
+        )
 
     @property
     def rationale(self) -> str:
