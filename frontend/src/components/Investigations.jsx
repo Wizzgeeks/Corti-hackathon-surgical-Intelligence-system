@@ -23,16 +23,18 @@ function Investigations({ caseId }) {
   // The report whose full summary is open, if any.
   const [viewing, setViewing] = useState(null)
 
-  const load = useCallback(
-    () =>
-      listInvestigations(caseId)
-        .then((data) => {
-          setError('')
-          setItems(data)
-        })
-        .catch((exc) => setError(exc.message)),
-    [caseId],
-  )
+  const load = useCallback(() => {
+    // The case record loads after this mounts, so the first render has no id
+    // yet — asking for `undefined` is a guaranteed 400.
+    if (!caseId) return Promise.resolve()
+
+    return listInvestigations(caseId)
+      .then((data) => {
+        setError('')
+        setItems(data)
+      })
+      .catch((exc) => setError(exc.message))
+  }, [caseId])
 
   useEffect(() => {
     load()
